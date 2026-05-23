@@ -74,11 +74,12 @@ The website lets you:
 
 - enter extra search topics or RSS feeds
 - choose how many Instagram posts to generate, up to 50 per website batch
-- preview the generated image
+- watch a progress bar while the batch runs in the background
+- preview and download each generated post as soon as it finishes
 - copy the long caption
 - download the PNG, caption text, and metadata
 
-For larger batches, increase "Posts to generate" in the website. Use "Stories per source" to control how many candidates are scanned before ranking; generating 10 posts usually works well with 8 or more stories per source. AI image generation is one request per post, so bigger batches take longer.
+For larger batches, increase "Posts to generate" in the website. Use "Stories per source" to control how many candidates are scanned before ranking; generating 10 posts usually works well with 8 or more stories per source. The website starts a background job, shows a progress bar, and displays each post as soon as it is ready. AI image generation is one request per post, so bigger batches take longer.
 
 If you installed the package, you can also start it with:
 
