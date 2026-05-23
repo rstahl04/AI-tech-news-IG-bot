@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 tech-ig-bot = "tech_ig_bot.cli:main"
+tech-ig-bot-web = "tech_ig_bot.web:main"
 
 [tool.setuptools.packages.find]
 include = ["tech_ig_bot*"]

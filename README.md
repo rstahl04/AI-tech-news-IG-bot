@@ -43,6 +43,34 @@ Preview ranked stories without creating images:
 tech-ig-bot --dry-run --no-enrich
 ```
 
+## Use the website
+
+Start the local website:
+
+```bash
+python3 -m tech_ig_bot.web
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000
+```
+
+The website lets you:
+
+- enter extra search topics or RSS feeds
+- choose how many Instagram posts to generate
+- preview the generated image
+- copy the long caption
+- download the PNG, caption text, and metadata
+
+If you installed the package, you can also start it with:
+
+```bash
+tech-ig-bot-web
+```
+
 ## Output
 
 For each selected story, the bot writes files like:
