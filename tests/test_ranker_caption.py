@@ -1,0 +1,46 @@
+import unittest
+
+from tech_ig_bot.caption import make_card_caption, make_instagram_caption
+from tech_ig_bot.models import Article
+from tech_ig_bot.ranker import rank_articles
+
+
+class RankerCaptionTest(unittest.TestCase):
+    def test_ranker_prefers_breakthrough_story(self) -> None:
+        ordinary = Article(
+            source="Example",
+            title="Company updates its app settings screen",
+            url="https://example.com/app",
+            summary="The release includes small interface changes.",
+        )
+        breakthrough = Article(
+            source="Example",
+            title="Quantum battery breakthrough sets new energy storage record",
+            url="https://example.com/battery",
+            summary="Researchers unveiled a prototype that could change future grids.",
+        )
+
+        ranked = rank_articles([ordinary, breakthrough], limit=2)
+
+        self.assertIs(ranked[0], breakthrough)
+        self.assertGreater(ranked[0].score, ranked[1].score)
+
+    def test_caption_includes_explainer_source_and_hashtags(self) -> None:
+        article = Article(
+            source="Science Wire",
+            title="Robotics breakthrough helps warehouse arms learn faster",
+            url="https://example.com/robotics",
+            summary="A new machine learning method lets robots learn from fewer demonstrations.",
+        )
+
+        card_caption = make_card_caption(article)
+        instagram_caption = make_instagram_caption(article)
+
+        self.assertIn("robots learn", card_caption)
+        self.assertIn("Why it matters:", instagram_caption)
+        self.assertIn("Source: Science Wire", instagram_caption)
+        self.assertIn("#EmergingTech", instagram_caption)
+
+
+if __name__ == "__main__":
+    unittest.main()
