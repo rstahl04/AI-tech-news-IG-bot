@@ -60,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print ranked candidates without rendering images.",
     )
     parser.add_argument(
+        "--image-mode",
+        default="ai",
+        choices=("ai", "procedural"),
+        help="Use AI-generated story images or the offline procedural fallback.",
+    )
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
@@ -89,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     for index, article in enumerate(ranked, start=1):
-        paths = render_article_post(article, output_dir=args.output_dir, index=index)
+        paths = render_article_post(article, output_dir=args.output_dir, index=index, image_mode=args.image_mode)
         print(f"Generated {paths['image']}")
         print(f"Caption  {paths['caption']}")
         print(f"Metadata {paths['metadata']}")

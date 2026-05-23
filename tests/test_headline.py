@@ -45,6 +45,38 @@ class HeadlineTest(unittest.TestCase):
 
         self.assertEqual(headline, "Robots Are Learning Real-World Skills Faster Than Before")
 
+    def test_specific_news_hooks_are_stronger(self) -> None:
+        examples = [
+            (
+                Article(
+                    source="Phys.org",
+                    title="Prototype sets record for optical quantum information technology",
+                    url="https://example.com/quantum-record",
+                ),
+                "A Prototype Just Set a Quantum Computing Record",
+            ),
+            (
+                Article(
+                    source="Science Wire",
+                    title="Scientists unveil DNA battery that charges directly from the sun",
+                    url="https://example.com/dna-battery",
+                ),
+                "Scientists Built a DNA Battery That Charges From Sunlight",
+            ),
+            (
+                Article(
+                    source="Robotics News",
+                    title="New smart artificial muscle could bring human-like feedback to humanoid robot",
+                    url="https://example.com/artificial-muscle",
+                ),
+                "This Artificial Muscle Could Give Humanoid Robots Touch",
+            ),
+        ]
+
+        for article, expected in examples:
+            with self.subTest(article=article.title):
+                self.assertEqual(make_technology_headline(article), expected)
+
     def test_marketing_and_fame_items_are_penalized(self) -> None:
         marketing = Article(
             source="News",

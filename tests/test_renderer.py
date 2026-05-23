@@ -23,12 +23,13 @@ class RendererTest(unittest.TestCase):
         )
 
         with TemporaryDirectory() as directory:
-            paths = render_article_post(article, Path(directory))
+            paths = render_article_post(article, Path(directory), image_mode="procedural")
 
             self.assertTrue(paths["image"].exists())
             self.assertTrue(paths["caption"].exists())
             self.assertTrue(paths["metadata"].exists())
             metadata = json.loads(paths["metadata"].read_text(encoding="utf-8"))
+            self.assertEqual(metadata["image_provider"], "procedural")
             self.assertEqual(metadata["visual_style"], "robot")
             with Image.open(paths["image"]) as image:
                 self.assertEqual(image.size, CANVAS_SIZE)
@@ -49,8 +50,8 @@ class RendererTest(unittest.TestCase):
 
         with TemporaryDirectory() as directory:
             output_dir = Path(directory)
-            quantum_paths = render_article_post(quantum, output_dir, index=1)
-            battery_paths = render_article_post(battery, output_dir, index=2)
+            quantum_paths = render_article_post(quantum, output_dir, index=1, image_mode="procedural")
+            battery_paths = render_article_post(battery, output_dir, index=2, image_mode="procedural")
 
             quantum_metadata = json.loads(quantum_paths["metadata"].read_text(encoding="utf-8"))
             battery_metadata = json.loads(battery_paths["metadata"].read_text(encoding="utf-8"))

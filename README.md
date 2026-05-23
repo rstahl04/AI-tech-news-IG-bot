@@ -5,7 +5,7 @@ feeds, favors expert/research-backed breakthroughs, and turns them into Instagra
 posts modeled after viral educational technology pages:
 
 - a 1080x1350 PNG with a scroll-stopping technology headline
-- topic-related generated artwork, such as quantum nodes, robot arms, batteries, DNA, chips, space, or AI networks
+- AI-generated topic artwork related to the headline, with an offline procedural fallback
 - an in-image quick explainer box for mobile-friendly learning
 - a separate `.caption.txt` file ready to paste into Instagram
 - a `.json` metadata file with source URL, score, and output paths
@@ -42,6 +42,12 @@ Preview ranked stories without creating images:
 
 ```bash
 tech-ig-bot --dry-run --no-enrich
+```
+
+Generate without external AI image generation, using the offline fallback instead:
+
+```bash
+tech-ig-bot --image-mode procedural --top 1 --output-dir output
 ```
 
 ## Use the website
@@ -83,9 +89,9 @@ output/
   01-ai-breakthrough-gives-robots-a-faster-way-to-learn.json
 ```
 
-The metadata includes the generated `visual_style` used for the image.
+The metadata includes `image_provider`, `image_prompt`, and `visual_style` so you can see whether the post used AI image generation or the fallback renderer.
 
-The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. Each image includes deterministic generated artwork related to the story topic, so quantum, robotics, battery, biotech, chip, space, clean-energy, and AI posts do not all look the same. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
+The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. Each image uses an AI image-generation request related to the story topic and headline, so quantum, robotics, battery, biotech, chip, space, clean-energy, and AI posts do not all look the same. If the image service is unavailable, the renderer falls back to deterministic procedural artwork. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
 
 ## Notes
 

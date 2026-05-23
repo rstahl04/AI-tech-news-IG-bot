@@ -8,11 +8,12 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .caption import make_card_caption, make_instagram_caption
 from .headline import make_technology_headline
+from .image_generation import generate_story_image
 from .models import Article
 from .visuals import draw_story_visual
 
 CANVAS_SIZE = (1080, 1350)
-MARGIN = 72
+MARGIN = 64
 FONT_CANDIDATES = (
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -25,8 +26,13 @@ FONT_BOLD_CANDIDATES = (
 )
 
 
-def render_article_post(article: Article, output_dir: Path, index: int = 1) -> dict[str, Path]:
-    """Render a square-ish Instagram portrait post and companion text files."""
+def render_article_post(
+    article: Article,
+    output_dir: Path,
+    index: int = 1,
+    image_mode: str = "ai",
+) -> dict[str, Path]:
+    """Render an Instagram portrait post and companion text files."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     headline = make_technology_headline(article)
@@ -35,7 +41,7 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
 
     card_caption = make_card_caption(article)
     instagram_caption = make_instagram_caption(article)
-    image, visual_style = _build_image(article, card_caption, headline)
+    image, metadata = _build_image(article, card_caption, headline, image_mode=image_mode)
 
     image_path = base.with_suffix(".png")
     caption_path = base.with_suffix(".caption.txt")
@@ -52,7 +58,7 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
                 "url": article.url,
                 "published": article.published,
                 "score": article.score,
-                "visual_style": visual_style,
+                **metadata,
                 "image": str(image_path),
                 "caption": str(caption_path),
             },
@@ -65,62 +71,106 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
     return {"image": image_path, "caption": caption_path, "metadata": metadata_path}
 
 
-def _build_image(article: Article, card_caption: str, headline: str) -> tuple[Image.Image, str]:
+def _build_image(
+    article: Article,
+    card_caption: str,
+    headline: str,
+    image_mode: str = "ai",
+) -> tuple[Image.Image, dict[str, str]]:
+    prompt = ""
+    image_provider = "procedural"
+    visual_style = "procedural"
+
+    if image_mode == "ai":
+        generated, image_provider, prompt = generate_story_image(article, headline, CANVAS_SIZE)
+        if generated is not None:
+            image = generated
+            visual_style = "ai-generated"
+        else:
+            image, visual_style = _procedural_background(article, headline)
+    else:
+        image, visual_style = _procedural_background(article, headline)
+        image_provider = "procedural"
+
+    draw = ImageDraw.Draw(image)
+    _draw_readability_overlays(image)
+    draw = ImageDraw.Draw(image)
+    _draw_top_chrome(draw, article)
+    _draw_headline(draw, headline)
+    _draw_micro_explainer(draw, card_caption)
+    _draw_footer(draw, article)
+
+    return image, {
+        "image_provider": image_provider,
+        "image_prompt": prompt,
+        "visual_style": visual_style,
+    }
+
+
+def _procedural_background(article: Article, headline: str) -> tuple[Image.Image, str]:
     image = Image.new("RGB", CANVAS_SIZE, "#0b1020")
     draw = ImageDraw.Draw(image)
     _draw_gradient(draw)
     _draw_decorative_shapes(draw)
     visual_style = draw_story_visual(image, article, headline)
-    draw = ImageDraw.Draw(image)
+    return image, visual_style
 
-    label_font = _font(34, bold=True)
-    source_font = _font(30)
-    headline_font = _font(72, bold=True)
-    body_font = _font(40)
-    footer_font = _font(26)
 
-    draw.rounded_rectangle((MARGIN, 70, 690, 132), radius=30, fill="#00f5d4")
-    draw.text((MARGIN + 28, 88), "STOP SCROLLING", fill="#08111f", font=label_font)
+def _draw_readability_overlays(image: Image.Image) -> None:
+    overlay = Image.new("RGBA", CANVAS_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    width, height = CANVAS_SIZE
 
-    source_line = f"REAL TECH NEWS / {article.source.upper()}"
+    # Darken the top for source chrome and the bottom for the viral headline.
+    for y in range(height):
+        top_alpha = max(0, int(170 * (1 - y / 420))) if y < 420 else 0
+        bottom_alpha = max(0, int(230 * ((y - 530) / (height - 530)))) if y > 530 else 0
+        alpha = min(245, max(top_alpha, bottom_alpha))
+        if alpha:
+            draw.line((0, y, width, y), fill=(0, 0, 0, alpha))
+
+    draw.rectangle((0, 0, width, height), outline=(255, 255, 255, 24), width=2)
+    image.paste(Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB"))
+
+
+def _draw_top_chrome(draw: ImageDraw.ImageDraw, article: Article) -> None:
+    pill_font = _font(28, bold=True)
+    source_font = _font(25, bold=True)
+    draw.rounded_rectangle((MARGIN, 54, 445, 112), radius=29, fill="#ffffff")
+    draw.text((MARGIN + 24, 70), "REAL TECH NEWS", fill="#07111f", font=pill_font)
+
+    source_line = article.source.upper()
     if article.display_date:
-        source_line += f"  |  {article.display_date.upper()}"
-    draw.text((MARGIN, 162), source_line, fill="#c8d3ff", font=source_font)
+        source_line += f"  /  {article.display_date.upper()}"
+    source_line = _truncate_for_width(draw, source_line, source_font, CANVAS_SIZE[0] - MARGIN * 2)
+    draw.text((MARGIN, 136), source_line, fill="#dbeafe", font=source_font)
 
-    headline_box = (MARGIN, 245, CANVAS_SIZE[0] - MARGIN, 665)
+
+def _draw_headline(draw: ImageDraw.ImageDraw, headline: str) -> None:
+    headline_font = _font(78, bold=True)
+    box = (MARGIN, 745, CANVAS_SIZE[0] - MARGIN, 1095)
     _draw_wrapped_text(
         draw,
         headline,
-        headline_box,
+        box,
         headline_font,
         fill="#ffffff",
-        line_spacing=12,
+        line_spacing=10,
+        shadow=True,
     )
 
-    caption_box = (MARGIN, 750, CANVAS_SIZE[0] - MARGIN, 1210)
-    draw.rounded_rectangle(caption_box, radius=42, fill="#f7f9ff")
-    draw.text(
-        (caption_box[0] + 42, caption_box[1] + 38),
-        "Why this matters",
-        fill="#101828",
-        font=_font(34, bold=True),
-    )
-    _draw_wrapped_text(
-        draw,
-        card_caption,
-        (caption_box[0] + 42, caption_box[1] + 96, caption_box[2] - 42, caption_box[3] - 38),
-        body_font,
-        fill="#273041",
-        line_spacing=8,
-    )
 
-    draw.text(
-        (MARGIN, 1260),
-        "Source-linked tech explainer - verify before posting",
-        fill="#98a2b3",
-        font=footer_font,
-    )
-    return image, visual_style
+def _draw_micro_explainer(draw: ImageDraw.ImageDraw, card_caption: str) -> None:
+    font = _font(31)
+    text = _first_sentence(card_caption, max_chars=155)
+    box = (MARGIN, 1116, CANVAS_SIZE[0] - MARGIN, 1218)
+    _draw_wrapped_text(draw, text, box, font, fill="#dbeafe", line_spacing=5, shadow=True)
+
+
+def _draw_footer(draw: ImageDraw.ImageDraw, article: Article) -> None:
+    footer_font = _font(25, bold=True)
+    text = "FOLLOW FOR TECH EXPLAINED  /  VERIFY SOURCE BEFORE POSTING"
+    draw.text((MARGIN, 1270), text, fill="#ffffff", font=footer_font)
 
 
 def _draw_gradient(draw: ImageDraw.ImageDraw) -> None:
@@ -137,7 +187,6 @@ def _draw_decorative_shapes(draw: ImageDraw.ImageDraw) -> None:
     draw.ellipse((690, 90, 1160, 560), fill="#1e3a8a")
     draw.ellipse((760, 170, 1090, 500), fill="#7c3aed")
     draw.ellipse((-160, 560, 260, 980), fill="#0f766e")
-    draw.line((72, 705, 1008, 705), fill="#00f5d4", width=5)
 
 
 def _draw_wrapped_text(
@@ -147,6 +196,7 @@ def _draw_wrapped_text(
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
     fill: str,
     line_spacing: int = 0,
+    shadow: bool = False,
 ) -> None:
     left, top, right, bottom = box
     max_width = right - left
@@ -156,8 +206,13 @@ def _draw_wrapped_text(
     y = top
     for line in lines:
         if y + line_height > bottom:
+            if shadow:
+                draw.text((left + 3, y + 3), "...", fill="#000000", font=font)
             draw.text((left, y), "...", fill=fill, font=font)
             return
+        if shadow:
+            for offset in ((4, 4), (2, 2), (0, 5)):
+                draw.text((left + offset[0], y + offset[1]), line, fill=(0, 0, 0), font=font)
         draw.text((left, y), line, fill=fill, font=font)
         y += line_height
 
@@ -183,6 +238,31 @@ def _wrap_text(
     if current:
         lines.append(" ".join(current))
     return lines
+
+
+def _truncate_for_width(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    max_width: int,
+) -> str:
+    if _text_width(draw, text, font) <= max_width:
+        return text
+    words = text.split()
+    while words and _text_width(draw, " ".join(words) + "...", font) > max_width:
+        words.pop()
+    return " ".join(words) + "..."
+
+
+def _first_sentence(value: str, max_chars: int) -> str:
+    value = value.strip()
+    for marker in (". ", "! ", "? "):
+        index = value.find(marker)
+        if 0 < index <= max_chars:
+            return value[: index + 1]
+    if len(value) <= max_chars:
+        return value
+    return " ".join(value[:max_chars].split()[:-1]).rstrip(" ,;:-") + "..."
 
 
 def _text_width(
