@@ -24,6 +24,12 @@ python3 -m pip install -e .
 tech-ig-bot --top 3 --output-dir output
 ```
 
+Generate 10 posts at once:
+
+```bash
+tech-ig-bot --top 10 --per-source 8 --output-dir output
+```
+
 The default run scans curated technology/science feeds plus Bing News RSS queries
 for topics such as AI, robotics, quantum computing, batteries, fusion, expert
 commentary, research prototypes, and other emerging technologies.
@@ -47,7 +53,7 @@ tech-ig-bot --dry-run --no-enrich
 Generate without external AI image generation, using the offline fallback instead:
 
 ```bash
-tech-ig-bot --image-mode procedural --top 1 --output-dir output
+tech-ig-bot --image-mode procedural --top 10 --per-source 8 --output-dir output
 ```
 
 ## Use the website
@@ -67,10 +73,12 @@ http://127.0.0.1:8000
 The website lets you:
 
 - enter extra search topics or RSS feeds
-- choose how many Instagram posts to generate
+- choose how many Instagram posts to generate, up to 50 per website batch
 - preview the generated image
 - copy the long caption
 - download the PNG, caption text, and metadata
+
+For larger batches, increase "Posts to generate" in the website. Use "Stories per source" to control how many candidates are scanned before ranking; generating 10 posts usually works well with 8 or more stories per source. AI image generation is one request per post, so bigger batches take longer.
 
 If you installed the package, you can also start it with:
 

@@ -15,9 +15,21 @@ class WebTest(unittest.TestCase):
 
         self.assertEqual(options.queries, ["quantum breakthrough", "robotics"])
         self.assertEqual(options.feeds, ["https://example.com/rss.xml"])
-        self.assertEqual(options.per_source, 20)
+        self.assertEqual(options.per_source, 99)
         self.assertEqual(options.top, 1)
         self.assertTrue(options.enrich)
+
+    def test_parse_generate_options_accepts_batch_counts(self) -> None:
+        options = parse_generate_options("top=10&per_source=25")
+
+        self.assertEqual(options.top, 10)
+        self.assertEqual(options.per_source, 25)
+
+    def test_parse_generate_options_caps_extreme_batches(self) -> None:
+        options = parse_generate_options("top=999&per_source=999")
+
+        self.assertEqual(options.top, 50)
+        self.assertEqual(options.per_source, 100)
 
     def test_load_recent_posts_reads_generated_metadata(self) -> None:
         with TemporaryDirectory() as directory:

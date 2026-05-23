@@ -49,6 +49,32 @@ class RankerCaptionTest(unittest.TestCase):
 
         self.assertIs(ranked[0], technology_story)
 
+    def test_ranker_prefers_unique_generated_headlines_for_batches(self) -> None:
+        first = Article(
+            source="Example",
+            title="AI prototype breakthrough for office workflows",
+            url="https://example.com/ai-1",
+            summary="Researchers demonstrated an artificial intelligence prototype.",
+        )
+        duplicate_hook = Article(
+            source="Example",
+            title="Another AI prototype breakthrough for workplace machines",
+            url="https://example.com/ai-2",
+            summary="Researchers demonstrated another artificial intelligence prototype.",
+        )
+        unique = Article(
+            source="Example",
+            title="Scientists unveil solid-state battery breakthrough",
+            url="https://example.com/battery",
+            summary="A battery prototype stores more energy.",
+        )
+
+        ranked = rank_articles([first, duplicate_hook, unique], limit=3)
+
+        self.assertIs(ranked[0], first)
+        self.assertIs(ranked[1], unique)
+        self.assertIs(ranked[2], duplicate_hook)
+
     def test_caption_includes_explainer_source_and_hashtags(self) -> None:
         article = Article(
             source="Science Wire",

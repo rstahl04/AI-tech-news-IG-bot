@@ -21,6 +21,9 @@ from .sources import build_bing_news_feed, default_sources
 
 LOGGER = logging.getLogger(__name__)
 
+MAX_WEB_POSTS = 50
+MAX_WEB_PER_SOURCE = 100
+
 
 @dataclass(slots=True)
 class WebPost:
@@ -47,8 +50,8 @@ def parse_generate_options(form_body: str) -> GenerateOptions:
     values = parse_qs(form_body, keep_blank_values=True)
     queries = _lines(values.get("query", [""])[0])
     feeds = _lines(values.get("feed", [""])[0])
-    per_source = _bounded_int(values.get("per_source", ["4"])[0], default=4, low=1, high=20)
-    top = _bounded_int(values.get("top", ["1"])[0], default=1, low=1, high=6)
+    per_source = _bounded_int(values.get("per_source", ["8"])[0], default=8, low=1, high=MAX_WEB_PER_SOURCE)
+    top = _bounded_int(values.get("top", ["1"])[0], default=1, low=1, high=MAX_WEB_POSTS)
     enrich = values.get("enrich", [""])[0] == "on"
     return GenerateOptions(
         queries=queries,
@@ -265,17 +268,17 @@ def render_index(
         <textarea id="feed" name="feed" placeholder="https://example.com/rss.xml"></textarea>
         <div class="row">
           <div>
-            <label for="top">Posts</label>
-            <input id="top" name="top" type="number" min="1" max="6" value="1">
+            <label for="top">Posts to generate</label>
+            <input id="top" name="top" type="number" min="1" max="50" value="1">
           </div>
           <div>
-            <label for="per_source">Stories/source</label>
-            <input id="per_source" name="per_source" type="number" min="1" max="20" value="4">
+            <label for="per_source">Stories per source</label>
+            <input id="per_source" name="per_source" type="number" min="1" max="100" value="8">
           </div>
         </div>
         <label class="checkbox">
           <input type="checkbox" name="enrich">
-          Fetch article pages for richer captions. This is slower.
+          Fetch article pages for richer captions. This is slower. Generating many AI images can also take a while.
         </label>
         <button class="primary" type="submit">Generate viral tech assets</button>
       </form>

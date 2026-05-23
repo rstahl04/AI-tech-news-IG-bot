@@ -4,7 +4,7 @@ from collections.abc import Iterable
 import re
 from datetime import datetime, timezone
 
-from .headline import technology_focus_score
+from .headline import make_technology_headline, technology_focus_score
 from .models import Article, parse_datetime
 
 
@@ -64,7 +64,23 @@ def rank_articles(articles: Iterable[Article], limit: int = 5) -> list[Article]:
     for article in ranked:
         article.score = score_article(article)
     ranked.sort(key=lambda item: item.score, reverse=True)
-    return ranked[:limit]
+
+    unique: list[Article] = []
+    duplicates: list[Article] = []
+    seen_headlines: set[str] = set()
+    for article in ranked:
+        headline_key = _headline_key(make_technology_headline(article))
+        if headline_key in seen_headlines:
+            duplicates.append(article)
+            continue
+        seen_headlines.add(headline_key)
+        unique.append(article)
+
+    return [*unique, *duplicates][:limit]
+
+
+def _headline_key(headline: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", headline.lower()).strip()
 
 
 def _recency_score(article: Article, now: datetime | None = None) -> float:
