@@ -11,6 +11,14 @@ NOISE_TERMS = (
     "superfans",
     "fan engagement",
     "sports fans",
+    "helldivers",
+    "warbond",
+    "video game",
+    "gaming",
+    "game trailer",
+    "mobile app verified",
+    "get your medical mobile app verified",
+    "verified by ieee",
 )
 
 
@@ -31,8 +39,44 @@ BUSINESS_TERMS = (
     "partnership",
     "partners with",
     "press release",
+    "verified",
     "wins",
 )
+
+EXPERT_SIGNAL_TERMS = (
+    "scientists",
+    "researchers",
+    "engineers",
+    "experts",
+    "study",
+    "study finds",
+    "according to",
+    "demonstrates",
+    "developed",
+    "prototype",
+    "experiment",
+    "discovery",
+    "lab",
+)
+
+VIRAL_TOPIC_HOOKS: dict[str, str] = {
+    "AI body maps": "AI Just Revealed Something Doctors Could Not Easily See",
+    "AI systems": "This AI Breakthrough Could Change How People Work With Machines",
+    "battery technology": "This Battery Tech Could Make Everyday Devices Last Longer",
+    "biotech": "This Biotech Advance Could Change How We Treat Disease",
+    "clean energy technology": "This Clean Energy Tech Could Change How We Power the Future",
+    "fusion energy": "Fusion Energy Just Took Another Step Toward the Real World",
+    "gene editing": "This Gene-Editing Advance Could Rewrite What Medicine Can Do",
+    "humanoid robots": "Humanoid Robots Are Getting Closer to Real-World Work",
+    "machine learning": "Machine Learning Is Starting to Solve Problems Humans Miss",
+    "mobile manipulation robots": "Robots Are Getting Better at Handling the Real World",
+    "next-generation chips": "This New Chip Tech Could Make Future Computers Faster",
+    "quantum batteries": "Quantum Batteries Could Change How Energy Gets Stored",
+    "quantum chips": "This Quantum Breakthrough Could Make Future Computers Cheaper",
+    "robots": "Robots Are Learning Real-World Skills Faster Than Before",
+    "solid-state batteries": "This Battery Breakthrough Could Make EVs Safer and Longer-Lasting",
+    "space technology": "This Space Tech Could Change What Humans Can Build Off Earth",
+}
 
 TECH_TOPICS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bmobile manipulation\b", re.I), "mobile manipulation robots"),
@@ -55,7 +99,7 @@ TECH_TOPICS: tuple[tuple[re.Pattern[str], str], ...] = (
 
 
 def make_technology_headline(article: Article, max_chars: int = 92) -> str:
-    """Create a social headline focused on the technology, not the company wrapper."""
+    """Create a scroll-stopping but source-grounded technology headline."""
 
     title = _clean_source_title(article.title)
     context = " ".join(part for part in (title, article.summary, article.content) if part)
@@ -63,40 +107,44 @@ def make_technology_headline(article: Article, max_chars: int = 92) -> str:
     title_lower = title.lower()
 
     if topic and _is_business_title(title_lower):
-        verb = _verb(topic, singular="takes", plural="take")
-        return _title_case(sentence_case_trim(f"{topic} {verb} a step toward real-world use", max_chars))
+        return _title_case(sentence_case_trim(VIRAL_TOPIC_HOOKS.get(topic, _expert_hook(topic)), max_chars))
 
     lab_to_market = re.search(r"from lab to ([a-z -]+)", title, flags=re.I)
     if topic and lab_to_market:
         destination = clean_text(lab_to_market.group(1)).rstrip(".")
         return _title_case(
             sentence_case_trim(
-                f"{topic} {_verb(topic, singular="is", plural="are")} moving from lab promise to {destination}",
-                max_chars,
-            )
-        )
-
-    breakthrough_topic = _extract_breakthrough_topic(title)
-    if breakthrough_topic:
-        return _title_case(
-            sentence_case_trim(
-                f"A breakthrough in {breakthrough_topic} points to real-world impact",
+                f"{topic} {_verb(topic, singular='is', plural='are')} moving from the lab to {destination}",
                 max_chars,
             )
         )
 
     reveal_match = re.search(r"\b(?:new )?(ai|artificial intelligence).*\breveals?\b(.+)", title, re.I)
     if reveal_match:
-        return _title_case(sentence_case_trim(f"AI reveals {clean_text(reveal_match.group(2))}", max_chars))
+        return _title_case(sentence_case_trim(f"AI just revealed {clean_text(reveal_match.group(2))}", max_chars))
+
+    breakthrough_topic = _extract_breakthrough_topic(title)
+    if breakthrough_topic:
+        return _title_case(
+            sentence_case_trim(
+                _breakthrough_hook(breakthrough_topic, topic),
+                max_chars,
+            )
+        )
+
+    if topic and _has_expert_signal(context):
+        return _title_case(sentence_case_trim(VIRAL_TOPIC_HOOKS.get(topic, _expert_hook(topic)), max_chars))
 
     if topic and "breakthrough" in title_lower:
-        return _title_case(sentence_case_trim(f"{topic} breakthrough points to real-world impact", max_chars))
+        return _title_case(sentence_case_trim(VIRAL_TOPIC_HOOKS.get(topic, _expert_hook(topic)), max_chars))
 
     if topic and _starts_with_company_style(title):
-        return _title_case(sentence_case_trim(f"{topic} could be the bigger story behind this news", max_chars))
+        return _title_case(sentence_case_trim(VIRAL_TOPIC_HOOKS.get(topic, _expert_hook(topic)), max_chars))
+
+    if topic and re.search(r"\b(?:could|may|might)\b", title_lower):
+        return _title_case(sentence_case_trim(_could_hook(topic), max_chars))
 
     return sentence_case_trim(title, max_chars)
-
 
 def technology_focus_score(article: Article) -> float:
     """Positive score for technology substance, negative for business-first framing."""
@@ -107,6 +155,9 @@ def technology_focus_score(article: Article) -> float:
 
     if _extract_topic(text):
         score += 5.0
+    score += min(sum(1 for term in EXPERT_SIGNAL_TERMS if term in text) * 2.0, 10.0)
+    if re.search(r"(?:could|may|might)", text):
+        score += 2.0
     if "breakthrough" in title and "award" not in title:
         score += 2.0
     matched_business_terms = sum(1 for term in BUSINESS_TERMS if term in title)
@@ -131,6 +182,26 @@ def technology_topic(article: Article) -> str:
     return _extract_topic(article.searchable_text)
 
 
+def _has_expert_signal(text: str) -> bool:
+    text_lower = text.lower()
+    return any(term in text_lower for term in EXPERT_SIGNAL_TERMS)
+
+
+def _expert_hook(topic: str) -> str:
+    return f"Experts Are Watching {topic} Because It Could Change What Comes Next"
+
+
+def _could_hook(topic: str) -> str:
+    return f"This {topic} shift could be bigger than it looks"
+
+
+def _breakthrough_hook(breakthrough_topic: str, detected_topic: str) -> str:
+    topic = detected_topic or breakthrough_topic
+    if topic in VIRAL_TOPIC_HOOKS:
+        return VIRAL_TOPIC_HOOKS[topic]
+    return f"This breakthrough in {breakthrough_topic} could change what comes next"
+
+
 def _extract_topic(text: str) -> str:
     for pattern, topic in TECH_TOPICS:
         if pattern.search(text):
@@ -149,18 +220,28 @@ def _extract_breakthrough_topic(title: str) -> str:
     )
     if match:
         topic = clean_text(match.group(1))
-        return re.sub(r"^(a|an|new|major|huge|first)\s+", "", topic, flags=re.I).lower()
+        topic = re.sub(r"^(a|an|new|major|huge|first)\s+", "", topic, flags=re.I).lower()
+        return "" if _is_bad_breakthrough_topic(topic) else topic
 
     match = re.search(r"breakthroughs?\s+(?:in|for)\s+([^,:;-]+)", title, flags=re.I)
     if match:
-        return clean_text(match.group(1)).lower()
+        topic = clean_text(match.group(1)).lower()
+        return "" if _is_bad_breakthrough_topic(topic) else topic
 
     match = re.search(r"([^,:;-]+)\s+breakthroughs?", title, flags=re.I)
     if match:
         topic = clean_text(match.group(1))
-        topic = re.sub(r"^(new|major|huge|first)\s+", "", topic, flags=re.I)
-        return topic.lower()
+        topic = re.sub(r"^(new|major|huge|first)\s+", "", topic, flags=re.I).lower()
+        return "" if _is_bad_breakthrough_topic(topic) else topic
     return ""
+
+
+def _is_bad_breakthrough_topic(topic: str) -> bool:
+    return bool(
+        re.fullmatch(r"[a-z]*-?\d+", topic)
+        or len(topic) < 4
+        or any(term in topic for term in ("exo", "warbond", "award"))
+    )
 
 
 def _clean_source_title(title: str) -> str:

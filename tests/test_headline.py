@@ -18,7 +18,7 @@ class HeadlineTest(unittest.TestCase):
 
         headline = make_technology_headline(article)
 
-        self.assertEqual(headline, "Mobile Manipulation Robots Take a Step Toward Real-World Use")
+        self.assertEqual(headline, "Robots Are Getting Better at Handling the Real World")
         self.assertNotIn("Acquires", headline)
         self.assertLess(technology_focus_score(article), 0)
 
@@ -31,7 +31,19 @@ class HeadlineTest(unittest.TestCase):
 
         headline = make_technology_headline(article)
 
-        self.assertEqual(headline, "A Breakthrough in Quantum Computing Points to Real-World Impact")
+        self.assertEqual(headline, "This Quantum Breakthrough Could Make Future Computers Cheaper")
+
+    def test_expert_signal_gets_scroll_stopping_hook(self) -> None:
+        article = Article(
+            source="Science Wire",
+            title="Researchers demonstrate new robot hand for delicate real-world tasks",
+            url="https://example.com/robot-hand",
+            summary="Scientists say the prototype could help robots work safely around people.",
+        )
+
+        headline = make_technology_headline(article)
+
+        self.assertEqual(headline, "Robots Are Learning Real-World Skills Faster Than Before")
 
     def test_marketing_and_fame_items_are_penalized(self) -> None:
         marketing = Article(
@@ -71,7 +83,7 @@ class HeadlineTest(unittest.TestCase):
 
         self.assertEqual(
             headline,
-            "Solid-State Batteries Are Moving From Lab Promise to Road-Ready",
+            "Solid-State Batteries Are Moving From the Lab to Road-Ready",
         )
 
 

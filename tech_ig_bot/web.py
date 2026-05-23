@@ -138,7 +138,7 @@ def render_index(
         post_cards = """
         <section class="empty">
           <h2>No posts generated yet</h2>
-          <p>Use the form to create educational, mobile-friendly technology explainers.</p>
+          <p>Use the form to create viral-style technology explainers from real current news.</p>
         </section>
         """
 
@@ -247,20 +247,20 @@ def render_index(
 <body>
   <main>
     <header>
-      <div class="eyebrow">Learn Something New</div>
-      <h1>Turn tech news into simple educational posts.</h1>
+      <div class="eyebrow">Viral Tech Explainers</div>
+      <h1>Turn current tech news into viral explainer posts.</h1>
       <p class="subtitle">
-        Scrape public technology feeds, pick the most interesting breakthroughs, and create a
-        simple explainer image plus a caption people can learn from quickly.
+        Scrape public technology feeds, find expert/research-backed stories, and create a
+        scroll-stopping image plus a caption that explains why people should care.
       </p>
     </header>
     {notice_html}
     {error_html}
     <section class="layout">
       <form class="panel" method="post" action="/generate">
-        <h2>Create an explainer</h2>
+        <h2>Create a viral tech post</h2>
         <label for="query">Extra search topics, one per line</label>
-        <textarea id="query" name="query" placeholder="space propulsion breakthrough&#10;humanoid robot prototype"></textarea>
+        <textarea id="query" name="query" placeholder="experts say new AI breakthrough&#10;scientists developed battery technology"></textarea>
         <label for="feed">Extra RSS feeds, one per line</label>
         <textarea id="feed" name="feed" placeholder="https://example.com/rss.xml"></textarea>
         <div class="row">
@@ -277,7 +277,7 @@ def render_index(
           <input type="checkbox" name="enrich">
           Fetch article pages for richer captions. This is slower.
         </label>
-        <button class="primary" type="submit">Generate explainer assets</button>
+        <button class="primary" type="submit">Generate viral tech assets</button>
       </form>
       <section class="results">
         {post_cards}

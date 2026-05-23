@@ -50,7 +50,7 @@ class WebTest(unittest.TestCase):
     def test_render_index_includes_form_and_post_actions(self) -> None:
         page = render_index([], Path("output"))
 
-        self.assertIn("Generate explainer assets", page)
+        self.assertIn("Generate viral tech assets", page)
         self.assertIn("No posts generated yet", page)
 
 

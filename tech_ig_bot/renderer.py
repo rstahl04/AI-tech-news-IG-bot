@@ -76,9 +76,9 @@ def _build_image(article: Article, card_caption: str, headline: str) -> Image.Im
     footer_font = _font(26)
 
     draw.rounded_rectangle((MARGIN, 70, 690, 132), radius=30, fill="#00f5d4")
-    draw.text((MARGIN + 28, 88), "LEARN SOMETHING NEW", fill="#08111f", font=label_font)
+    draw.text((MARGIN + 28, 88), "STOP SCROLLING", fill="#08111f", font=label_font)
 
-    source_line = f"TECH EXPLAINER / {article.source.upper()}"
+    source_line = f"REAL TECH NEWS / {article.source.upper()}"
     if article.display_date:
         source_line += f"  |  {article.display_date.upper()}"
     draw.text((MARGIN, 162), source_line, fill="#c8d3ff", font=source_font)
@@ -97,7 +97,7 @@ def _build_image(article: Article, card_caption: str, headline: str) -> Image.Im
     draw.rounded_rectangle(caption_box, radius=42, fill="#f7f9ff")
     draw.text(
         (caption_box[0] + 42, caption_box[1] + 38),
-        "Quick explainer",
+        "Why this matters",
         fill="#101828",
         font=_font(34, bold=True),
     )
@@ -112,7 +112,7 @@ def _build_image(article: Article, card_caption: str, headline: str) -> Image.Im
 
     draw.text(
         (MARGIN, 1260),
-        "Public-source explainer - verify details before posting",
+        "Source-linked tech explainer - verify before posting",
         fill="#98a2b3",
         font=footer_font,
     )

@@ -1,10 +1,10 @@
 # AI Tech News Instagram Bot
 
-This project discovers exciting technology and science stories from public RSS/news
-feeds, ranks the best breakthrough candidates, and turns them into Instagram-ready
-post assets:
+This project discovers current technology and science stories from public RSS/news
+feeds, favors expert/research-backed breakthroughs, and turns them into Instagram-ready
+posts modeled after viral educational technology pages:
 
-- a 1080x1350 PNG with a bold educational headline
+- a 1080x1350 PNG with a scroll-stopping technology headline
 - an in-image quick explainer box for mobile-friendly learning
 - a separate `.caption.txt` file ready to paste into Instagram
 - a `.json` metadata file with source URL, score, and output paths
@@ -24,8 +24,8 @@ tech-ig-bot --top 3 --output-dir output
 ```
 
 The default run scans curated technology/science feeds plus Bing News RSS queries
-for topics such as AI, robotics, quantum computing, batteries, fusion, and other
-emerging technologies.
+for topics such as AI, robotics, quantum computing, batteries, fusion, expert
+commentary, research prototypes, and other emerging technologies.
 
 Add your own discovery terms or RSS feeds:
 
@@ -82,14 +82,15 @@ output/
   01-ai-breakthrough-gives-robots-a-faster-way-to-learn.json
 ```
 
-The PNG is designed for Instagram portrait posts with an educational, learn-something-new style inspired by popular technology explainer pages. The separate caption file contains a hook, plain-language explanation, source attribution, and hashtags.
+The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
 
 ## Notes
 
 - The scraper uses public RSS/Atom feeds and article pages. Some publishers may
   block automated requests or provide short summaries only.
-- The ranking heuristic favors terms associated with breakthroughs, prototypes,
-  records, AI, robotics, quantum computing, batteries, energy, biotech, and space.
+- The ranking heuristic favors expert/research signals, breakthroughs, prototypes,
+  records, AI, robotics, quantum computing, batteries, energy, biotech, and space,
+  while pushing down acquisitions, awards, marketing posts, and unrelated gaming/news noise.
 - Always verify the generated copy and source article before posting.
 
 ## Tests

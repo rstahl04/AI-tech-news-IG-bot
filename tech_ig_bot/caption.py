@@ -26,12 +26,12 @@ TOPIC_EXPLAINERS: dict[str, str] = {
 
 
 DEFAULT_HASHTAGS: tuple[str, ...] = (
-    "#EmergingTech",
-    "#Innovation",
-    "#TechNews",
-    "#FutureTech",
-    "#Breakthrough",
-    "#AI",
+    "#technology",
+    "#innovation",
+    "#ai",
+    "#futuretech",
+    "#technews",
+    "#reels",
 )
 
 
@@ -53,16 +53,18 @@ def make_instagram_caption(article: Article, max_chars: int = 1200) -> str:
     """Create a longer caption to paste into the Instagram post body."""
 
     headline = make_technology_headline(article)
-    explainer = make_card_caption(article, max_chars=650)
+    explainer = make_card_caption(article, max_chars=520)
     parts = [
-        f"Learn something new: {headline}",
+        "FOLLOW for tech explained simply every day 🧠🤖💫",
         "",
-        f"What it means: {explainer}",
+        headline,
         "",
-        "Why it matters: This is worth watching because it points to where technology "
-        "could become more useful, accessible, or powerful next.",
+        explainer,
         "",
-        f"Source: {article.source}",
+        "Why people are watching: experts, researchers, and builders are racing to see "
+        "whether this kind of technology can move from impressive demo to real-world use.",
+        "",
+        f"Via: {article.source}",
     ]
     if article.url:
         parts.append(article.url)
@@ -73,4 +75,4 @@ def make_instagram_caption(article: Article, max_chars: int = 1200) -> str:
         return caption
 
     clipped = sentence_case_trim(caption, max_chars=max_chars)
-    return clipped.replace(" Why it matters:", "\n\nWhy it matters:")
+    return clipped.replace(" Why people are watching:", "\n\nWhy people are watching:")

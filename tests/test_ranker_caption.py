@@ -61,11 +61,10 @@ class RankerCaptionTest(unittest.TestCase):
         instagram_caption = make_instagram_caption(article)
 
         self.assertIn("Robots combine sensors", card_caption)
-        self.assertIn("Learn something new:", instagram_caption)
-        self.assertIn("What it means:", instagram_caption)
-        self.assertIn("Why it matters:", instagram_caption)
-        self.assertIn("Source: Science Wire", instagram_caption)
-        self.assertIn("#EmergingTech", instagram_caption)
+        self.assertIn("FOLLOW for tech explained simply", instagram_caption)
+        self.assertIn("Why people are watching:", instagram_caption)
+        self.assertIn("Via: Science Wire", instagram_caption)
+        self.assertIn("#technology", instagram_caption)
 
 
 if __name__ == "__main__":

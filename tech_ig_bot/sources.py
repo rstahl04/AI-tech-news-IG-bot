@@ -7,20 +7,27 @@ from .models import FeedSource
 
 DEFAULT_FEEDS: tuple[FeedSource, ...] = (
     FeedSource("MIT Technology Review", "https://www.technologyreview.com/feed/"),
-    FeedSource("The Verge", "https://www.theverge.com/rss/index.xml"),
-    FeedSource("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"),
-    FeedSource("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
     FeedSource("ScienceDaily Technology", "https://www.sciencedaily.com/rss/top/technology.xml"),
+    FeedSource("Phys.org Technology", "https://phys.org/rss-feed/technology-news/"),
+    FeedSource("IEEE Spectrum", "https://spectrum.ieee.org/rss/fulltext"),
+    FeedSource("New Atlas", "https://newatlas.com/index.rss"),
     FeedSource("Nature Technology", "https://www.nature.com/subjects/technology.rss"),
+    FeedSource("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"),
+    FeedSource("The Verge", "https://www.theverge.com/rss/index.xml"),
+    FeedSource("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
     FeedSource("Hacker News", "https://hnrss.org/frontpage?points=100"),
 )
 
 DEFAULT_QUERIES: tuple[str, ...] = (
-    "exciting new technology breakthrough",
-    "artificial intelligence breakthrough",
-    "robotics breakthrough",
-    "quantum computing breakthrough",
-    "battery technology breakthrough",
+    "experts say new technology breakthrough",
+    "scientists developed new technology",
+    "researchers demonstrate breakthrough technology",
+    "artificial intelligence breakthrough experts say",
+    "robotics breakthrough researchers developed",
+    "quantum computing breakthrough researchers",
+    "battery technology breakthrough scientists",
+    "new technology could change future",
+    "emerging technology prototype real world",
 )
 
 
