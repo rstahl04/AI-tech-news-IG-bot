@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .headline import make_technology_headline
 from .models import Article
 from .text import sentence_case_trim
 
@@ -31,7 +32,7 @@ def make_instagram_caption(article: Article, max_chars: int = 1200) -> str:
 
     explainer = make_card_caption(article, max_chars=650)
     parts = [
-        article.title,
+        make_technology_headline(article),
         "",
         f"Why it matters: {explainer}",
         "",

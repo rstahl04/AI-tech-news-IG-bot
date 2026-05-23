@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 
 from .fetcher import collect_articles
+from .headline import make_technology_headline
 from .models import Article, FeedSource
 from .ranker import rank_articles
 from .renderer import render_article_post
@@ -107,7 +108,9 @@ def _build_sources(queries: list[str], feeds: list[str]) -> list[FeedSource]:
 
 def _print_ranked(articles: list[Article]) -> None:
     for index, article in enumerate(articles, start=1):
-        print(f"{index}. [{article.score}] {article.title}")
+        print(f"{index}. [{article.score}] {make_technology_headline(article)}")
+        if make_technology_headline(article) != article.title:
+            print(f"   Original: {article.title}")
         print(f"   Source: {article.source}")
         print(f"   URL: {article.url}")
 

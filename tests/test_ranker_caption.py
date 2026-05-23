@@ -25,6 +25,30 @@ class RankerCaptionTest(unittest.TestCase):
         self.assertIs(ranked[0], breakthrough)
         self.assertGreater(ranked[0].score, ranked[1].score)
 
+    def test_ranker_prefers_technology_over_acquisition_framing(self) -> None:
+        company_story = Article(
+            source="Example",
+            title=(
+                "Locus Robotics Acquires Nexera Robotics, Advancing a Patented "
+                "Breakthrough in Mobile Manipulation"
+            ),
+            url="https://example.com/acquisition",
+            summary="The acquisition expands a company portfolio around warehouse robotics.",
+        )
+        technology_story = Article(
+            source="Example",
+            title="New robot hand learns delicate tasks from a single demonstration",
+            url="https://example.com/robot-hand",
+            summary=(
+                "Researchers built a robotics prototype that could make mobile "
+                "manipulation more useful in factories and homes."
+            ),
+        )
+
+        ranked = rank_articles([company_story, technology_story], limit=2)
+
+        self.assertIs(ranked[0], technology_story)
+
     def test_caption_includes_explainer_source_and_hashtags(self) -> None:
         article = Article(
             source="Science Wire",

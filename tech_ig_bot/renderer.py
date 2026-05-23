@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from .caption import make_card_caption, make_instagram_caption
+from .headline import make_technology_headline
 from .models import Article
 
 CANVAS_SIZE = (1080, 1350)
@@ -27,12 +28,13 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
     """Render a square-ish Instagram portrait post and companion text files."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    slug = _slugify(article.title)[:72] or f"post-{index}"
+    headline = make_technology_headline(article)
+    slug = _slugify(headline)[:72] or f"post-{index}"
     base = output_dir / f"{index:02d}-{slug}"
 
     card_caption = make_card_caption(article)
     instagram_caption = make_instagram_caption(article)
-    image = _build_image(article, card_caption)
+    image = _build_image(article, card_caption, headline)
 
     image_path = base.with_suffix(".png")
     caption_path = base.with_suffix(".caption.txt")
@@ -43,7 +45,8 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
     metadata_path.write_text(
         json.dumps(
             {
-                "title": article.title,
+                "title": headline,
+                "original_title": article.title,
                 "source": article.source,
                 "url": article.url,
                 "published": article.published,
@@ -60,7 +63,7 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
     return {"image": image_path, "caption": caption_path, "metadata": metadata_path}
 
 
-def _build_image(article: Article, card_caption: str) -> Image.Image:
+def _build_image(article: Article, card_caption: str, headline: str) -> Image.Image:
     image = Image.new("RGB", CANVAS_SIZE, "#0b1020")
     draw = ImageDraw.Draw(image)
     _draw_gradient(draw)
@@ -83,7 +86,7 @@ def _build_image(article: Article, card_caption: str) -> Image.Image:
     headline_box = (MARGIN, 245, CANVAS_SIZE[0] - MARGIN, 650)
     _draw_wrapped_text(
         draw,
-        article.title,
+        headline,
         headline_box,
         headline_font,
         fill="#ffffff",

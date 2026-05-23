@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import re
 from datetime import datetime, timezone
 
+from .headline import technology_focus_score
 from .models import Article, parse_datetime
 
 
@@ -42,8 +44,9 @@ def score_article(article: Article, now: datetime | None = None) -> float:
     score = 0.0
 
     for keyword, weight in KEYWORD_WEIGHTS.items():
-        count = text.count(keyword)
-        title_bonus = 1.6 if keyword in article.title.lower() else 1.0
+        pattern = re.compile(r"\b" + re.escape(keyword) + r"\b")
+        count = len(pattern.findall(text))
+        title_bonus = 1.6 if pattern.search(article.title.lower()) else 1.0
         score += count * weight * title_bonus
 
     if article.summary:
@@ -51,6 +54,7 @@ def score_article(article: Article, now: datetime | None = None) -> float:
     if article.content:
         score += 1.5
 
+    score += technology_focus_score(article)
     score += _recency_score(article, now=now)
     return round(score, 3)
 

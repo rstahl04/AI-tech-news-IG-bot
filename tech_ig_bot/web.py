@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from .caption import make_instagram_caption
 from .fetcher import collect_articles
+from .headline import make_technology_headline
 from .models import Article, FeedSource
 from .ranker import rank_articles
 from .renderer import render_article_post
@@ -75,7 +76,7 @@ def generate_posts(options: GenerateOptions, output_dir: Path) -> list[WebPost]:
         paths = render_article_post(article, output_dir=run_dir, index=index)
         posts.append(
             WebPost(
-                title=article.title,
+                title=make_technology_headline(article),
                 source=article.source,
                 url=article.url,
                 score=article.score,
