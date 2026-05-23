@@ -14,6 +14,34 @@ from .visuals import draw_story_visual
 
 CANVAS_SIZE = (1080, 1350)
 MARGIN = 64
+HIGHLIGHT_GREEN = "#39ff14"
+HIGHLIGHT_WORDS = {
+    "ai",
+    "artificial",
+    "battery",
+    "breakthrough",
+    "built",
+    "cheaper",
+    "chip",
+    "chips",
+    "computers",
+    "dna",
+    "energy",
+    "faster",
+    "future",
+    "humanoid",
+    "major",
+    "muscle",
+    "prototype",
+    "quantum",
+    "record",
+    "robot",
+    "robots",
+    "scientists",
+    "stunned",
+    "sunlight",
+    "touch",
+}
 FONT_CANDIDATES = (
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -42,6 +70,7 @@ def render_article_post(
     card_caption = make_card_caption(article)
     instagram_caption = make_instagram_caption(article)
     image, metadata = _build_image(article, card_caption, headline, image_mode=image_mode)
+    highlighted_words = _highlighted_words(headline)
 
     image_path = base.with_suffix(".png")
     caption_path = base.with_suffix(".caption.txt")
@@ -59,6 +88,7 @@ def render_article_post(
                 "published": article.published,
                 "score": article.score,
                 **metadata,
+                "highlighted_words": highlighted_words,
                 "image": str(image_path),
                 "caption": str(caption_path),
             },
@@ -136,7 +166,7 @@ def _draw_readability_overlays(image: Image.Image) -> None:
 def _draw_top_chrome(draw: ImageDraw.ImageDraw, article: Article) -> None:
     pill_font = _font(28, bold=True)
     source_font = _font(25, bold=True)
-    draw.rounded_rectangle((MARGIN, 54, 445, 112), radius=29, fill="#ffffff")
+    draw.rounded_rectangle((MARGIN, 54, 445, 112), radius=29, fill=HIGHLIGHT_GREEN)
     draw.text((MARGIN + 24, 70), "REAL TECH NEWS", fill="#07111f", font=pill_font)
 
     source_line = article.source.upper()
@@ -149,12 +179,13 @@ def _draw_top_chrome(draw: ImageDraw.ImageDraw, article: Article) -> None:
 def _draw_headline(draw: ImageDraw.ImageDraw, headline: str) -> None:
     headline_font = _font(78, bold=True)
     box = (MARGIN, 745, CANVAS_SIZE[0] - MARGIN, 1095)
-    _draw_wrapped_text(
+    _draw_wrapped_highlighted_text(
         draw,
         headline,
         box,
         headline_font,
         fill="#ffffff",
+        highlight_fill=HIGHLIGHT_GREEN,
         line_spacing=10,
         shadow=True,
     )
@@ -164,13 +195,30 @@ def _draw_micro_explainer(draw: ImageDraw.ImageDraw, card_caption: str) -> None:
     font = _font(31)
     text = _first_sentence(card_caption, max_chars=155)
     box = (MARGIN, 1116, CANVAS_SIZE[0] - MARGIN, 1218)
-    _draw_wrapped_text(draw, text, box, font, fill="#dbeafe", line_spacing=5, shadow=True)
+    _draw_wrapped_highlighted_text(
+        draw,
+        text,
+        box,
+        font,
+        fill="#dbeafe",
+        highlight_fill=HIGHLIGHT_GREEN,
+        line_spacing=5,
+        shadow=True,
+    )
 
 
 def _draw_footer(draw: ImageDraw.ImageDraw, article: Article) -> None:
     footer_font = _font(25, bold=True)
     text = "FOLLOW FOR TECH EXPLAINED  /  VERIFY SOURCE BEFORE POSTING"
-    draw.text((MARGIN, 1270), text, fill="#ffffff", font=footer_font)
+    _draw_inline_highlighted_text(
+        draw,
+        text,
+        (MARGIN, 1270),
+        footer_font,
+        fill="#ffffff",
+        highlight_fill=HIGHLIGHT_GREEN,
+        shadow=True,
+    )
 
 
 def _draw_gradient(draw: ImageDraw.ImageDraw) -> None:
@@ -215,6 +263,69 @@ def _draw_wrapped_text(
                 draw.text((left + offset[0], y + offset[1]), line, fill=(0, 0, 0), font=font)
         draw.text((left, y), line, fill=fill, font=font)
         y += line_height
+
+
+def _draw_wrapped_highlighted_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    box: tuple[int, int, int, int],
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    fill: str,
+    highlight_fill: str,
+    line_spacing: int = 0,
+    shadow: bool = False,
+) -> None:
+    left, top, right, bottom = box
+    max_width = right - left
+    lines = _wrap_text(draw, text, font, max_width)
+    line_height = _line_height(draw, font) + line_spacing
+
+    y = top
+    for line in lines:
+        if y + line_height > bottom:
+            _draw_inline_highlighted_text(
+                draw,
+                "...",
+                (left, y),
+                font,
+                fill=fill,
+                highlight_fill=highlight_fill,
+                shadow=shadow,
+            )
+            return
+        _draw_inline_highlighted_text(
+            draw,
+            line,
+            (left, y),
+            font,
+            fill=fill,
+            highlight_fill=highlight_fill,
+            shadow=shadow,
+        )
+        y += line_height
+
+
+def _draw_inline_highlighted_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    position: tuple[int, int],
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    fill: str,
+    highlight_fill: str,
+    shadow: bool = False,
+) -> None:
+    x, y = position
+    words = text.split()
+    space_width = _text_width(draw, " ", font)
+    for index, word in enumerate(words):
+        word_fill = highlight_fill if _is_highlight_word(word) else fill
+        if shadow:
+            for offset in ((4, 4), (2, 2), (0, 5)):
+                draw.text((x + offset[0], y + offset[1]), word, fill=(0, 0, 0), font=font)
+        draw.text((x, y), word, fill=word_fill, font=font)
+        x += _text_width(draw, word, font)
+        if index < len(words) - 1:
+            x += space_width
 
 
 def _wrap_text(
@@ -263,6 +374,25 @@ def _first_sentence(value: str, max_chars: int) -> str:
     if len(value) <= max_chars:
         return value
     return " ".join(value[:max_chars].split()[:-1]).rstrip(" ,;:-") + "..."
+
+
+def _highlighted_words(text: str) -> list[str]:
+    words: list[str] = []
+    seen: set[str] = set()
+    for word in text.split():
+        normalized = _normalize_highlight_word(word)
+        if normalized in HIGHLIGHT_WORDS and normalized not in seen:
+            words.append(word.strip(".,:;!?()[]{}\"'").strip())
+            seen.add(normalized)
+    return words
+
+
+def _is_highlight_word(word: str) -> bool:
+    return _normalize_highlight_word(word) in HIGHLIGHT_WORDS
+
+
+def _normalize_highlight_word(word: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", word.lower())
 
 
 def _text_width(

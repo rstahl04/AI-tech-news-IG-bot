@@ -31,6 +31,8 @@ class RendererTest(unittest.TestCase):
             metadata = json.loads(paths["metadata"].read_text(encoding="utf-8"))
             self.assertEqual(metadata["image_provider"], "procedural")
             self.assertEqual(metadata["visual_style"], "robot")
+            self.assertIn("Robots", metadata["highlighted_words"])
+            self.assertIn("Faster", metadata["highlighted_words"])
             with Image.open(paths["image"]) as image:
                 self.assertEqual(image.size, CANVAS_SIZE)
 
