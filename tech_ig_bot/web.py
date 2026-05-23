@@ -548,6 +548,14 @@ class TechNewsHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
+    def _send_json(self, payload: dict[str, object]) -> None:
+        encoded = json.dumps(payload).encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
     def _send_generated_file(self, relative_url_path: str) -> None:
         relative_path = Path(unquote(relative_url_path))
         root = self.output_dir.resolve()
