@@ -125,6 +125,12 @@ def technology_focus_score(article: Article) -> float:
     return score
 
 
+def technology_topic(article: Article) -> str:
+    """Return the main technology topic detected in an article."""
+
+    return _extract_topic(article.searchable_text)
+
+
 def _extract_topic(text: str) -> str:
     for pattern, topic in TECH_TOPICS:
         if pattern.search(text):

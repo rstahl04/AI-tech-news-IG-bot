@@ -4,8 +4,8 @@ This project discovers exciting technology and science stories from public RSS/n
 feeds, ranks the best breakthrough candidates, and turns them into Instagram-ready
 post assets:
 
-- a 1080x1350 PNG with a bold headline
-- an in-image explainer box for a longer caption-style summary
+- a 1080x1350 PNG with a bold educational headline
+- an in-image quick explainer box for mobile-friendly learning
 - a separate `.caption.txt` file ready to paste into Instagram
 - a `.json` metadata file with source URL, score, and output paths
 
@@ -82,8 +82,7 @@ output/
   01-ai-breakthrough-gives-robots-a-faster-way-to-learn.json
 ```
 
-The PNG is designed for Instagram portrait posts. The separate caption file
-contains a longer caption with source attribution and hashtags.
+The PNG is designed for Instagram portrait posts with an educational, learn-something-new style inspired by popular technology explainer pages. The separate caption file contains a hook, plain-language explanation, source attribution, and hashtags.
 
 ## Notes
 

@@ -75,15 +75,15 @@ def _build_image(article: Article, card_caption: str, headline: str) -> Image.Im
     body_font = _font(40)
     footer_font = _font(26)
 
-    draw.rounded_rectangle((MARGIN, 70, 560, 132), radius=30, fill="#00f5d4")
-    draw.text((MARGIN + 28, 88), "BREAKTHROUGH RADAR", fill="#08111f", font=label_font)
+    draw.rounded_rectangle((MARGIN, 70, 690, 132), radius=30, fill="#00f5d4")
+    draw.text((MARGIN + 28, 88), "LEARN SOMETHING NEW", fill="#08111f", font=label_font)
 
-    source_line = article.source.upper()
+    source_line = f"TECH EXPLAINER / {article.source.upper()}"
     if article.display_date:
         source_line += f"  |  {article.display_date.upper()}"
     draw.text((MARGIN, 162), source_line, fill="#c8d3ff", font=source_font)
 
-    headline_box = (MARGIN, 245, CANVAS_SIZE[0] - MARGIN, 650)
+    headline_box = (MARGIN, 245, CANVAS_SIZE[0] - MARGIN, 665)
     _draw_wrapped_text(
         draw,
         headline,
@@ -93,11 +93,11 @@ def _build_image(article: Article, card_caption: str, headline: str) -> Image.Im
         line_spacing=12,
     )
 
-    caption_box = (MARGIN, 760, CANVAS_SIZE[0] - MARGIN, 1210)
+    caption_box = (MARGIN, 750, CANVAS_SIZE[0] - MARGIN, 1210)
     draw.rounded_rectangle(caption_box, radius=42, fill="#f7f9ff")
     draw.text(
         (caption_box[0] + 42, caption_box[1] + 38),
-        "What happened",
+        "Quick explainer",
         fill="#101828",
         font=_font(34, bold=True),
     )
@@ -112,7 +112,7 @@ def _build_image(article: Article, card_caption: str, headline: str) -> Image.Im
 
     draw.text(
         (MARGIN, 1260),
-        "Generated from public news feeds - verify before posting",
+        "Public-source explainer - verify details before posting",
         fill="#98a2b3",
         font=footer_font,
     )

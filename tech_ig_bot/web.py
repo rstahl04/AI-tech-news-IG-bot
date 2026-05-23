@@ -138,7 +138,7 @@ def render_index(
         post_cards = """
         <section class="empty">
           <h2>No posts generated yet</h2>
-          <p>Use the form to discover current technology stories and create Instagram assets.</p>
+          <p>Use the form to create educational, mobile-friendly technology explainers.</p>
         </section>
         """
 
@@ -247,18 +247,18 @@ def render_index(
 <body>
   <main>
     <header>
-      <div class="eyebrow">Breakthrough Radar</div>
-      <h1>Generate Instagram posts from emerging tech news.</h1>
+      <div class="eyebrow">Learn Something New</div>
+      <h1>Turn tech news into simple educational posts.</h1>
       <p class="subtitle">
-        Scrape public technology feeds, rank exciting breakthroughs, and create a polished
-        Instagram image plus a long caption you can review before posting.
+        Scrape public technology feeds, pick the most interesting breakthroughs, and create a
+        simple explainer image plus a caption people can learn from quickly.
       </p>
     </header>
     {notice_html}
     {error_html}
     <section class="layout">
       <form class="panel" method="post" action="/generate">
-        <h2>Generate posts</h2>
+        <h2>Create an explainer</h2>
         <label for="query">Extra search topics, one per line</label>
         <textarea id="query" name="query" placeholder="space propulsion breakthrough&#10;humanoid robot prototype"></textarea>
         <label for="feed">Extra RSS feeds, one per line</label>
@@ -277,7 +277,7 @@ def render_index(
           <input type="checkbox" name="enrich">
           Fetch article pages for richer captions. This is slower.
         </label>
-        <button class="primary" type="submit">Generate Instagram assets</button>
+        <button class="primary" type="submit">Generate explainer assets</button>
       </form>
       <section class="results">
         {post_cards}
