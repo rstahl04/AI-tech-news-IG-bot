@@ -87,6 +87,36 @@ If you installed the package, you can also start it with:
 tech-ig-bot-web
 ```
 
+
+## Deploy for a permanent link
+
+Temporary tunnel links can time out. For a more permanent public URL, deploy the
+app as a web service. This repo includes a `Dockerfile` and `render.yaml` for
+Render.
+
+Render steps:
+
+1. Push this branch to GitHub.
+2. Go to Render and create a new Blueprint or Web Service from this repository.
+3. Render will detect `render.yaml` / `Dockerfile`.
+4. Deploy it.
+5. Use the generated Render URL, for example:
+
+```text
+https://ai-tech-news-ig-bot.onrender.com
+```
+
+The deployed service runs the same website and supports background batch jobs,
+progress updates, generated images, and downloads.
+
+Notes:
+
+- AI image generation is one external request per post, so large batches can take
+  a while.
+- Generated files are stored on the service filesystem. For long-term storage,
+  add persistent disk or object storage later.
+- You can also deploy the Dockerfile to another host that supports containers.
+
 ## Output
 
 For each selected story, the bot writes files like:
