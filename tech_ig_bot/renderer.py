@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .caption import make_card_caption, make_instagram_caption
 from .headline import make_technology_headline
 from .models import Article
+from .visuals import draw_story_visual
 
 CANVAS_SIZE = (1080, 1350)
 MARGIN = 72
@@ -34,7 +35,7 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
 
     card_caption = make_card_caption(article)
     instagram_caption = make_instagram_caption(article)
-    image = _build_image(article, card_caption, headline)
+    image, visual_style = _build_image(article, card_caption, headline)
 
     image_path = base.with_suffix(".png")
     caption_path = base.with_suffix(".caption.txt")
@@ -51,6 +52,7 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
                 "url": article.url,
                 "published": article.published,
                 "score": article.score,
+                "visual_style": visual_style,
                 "image": str(image_path),
                 "caption": str(caption_path),
             },
@@ -63,11 +65,13 @@ def render_article_post(article: Article, output_dir: Path, index: int = 1) -> d
     return {"image": image_path, "caption": caption_path, "metadata": metadata_path}
 
 
-def _build_image(article: Article, card_caption: str, headline: str) -> Image.Image:
+def _build_image(article: Article, card_caption: str, headline: str) -> tuple[Image.Image, str]:
     image = Image.new("RGB", CANVAS_SIZE, "#0b1020")
     draw = ImageDraw.Draw(image)
     _draw_gradient(draw)
     _draw_decorative_shapes(draw)
+    visual_style = draw_story_visual(image, article, headline)
+    draw = ImageDraw.Draw(image)
 
     label_font = _font(34, bold=True)
     source_font = _font(30)
@@ -116,7 +120,7 @@ def _build_image(article: Article, card_caption: str, headline: str) -> Image.Im
         fill="#98a2b3",
         font=footer_font,
     )
-    return image
+    return image, visual_style
 
 
 def _draw_gradient(draw: ImageDraw.ImageDraw) -> None:

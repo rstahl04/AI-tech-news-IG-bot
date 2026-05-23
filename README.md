@@ -5,6 +5,7 @@ feeds, favors expert/research-backed breakthroughs, and turns them into Instagra
 posts modeled after viral educational technology pages:
 
 - a 1080x1350 PNG with a scroll-stopping technology headline
+- topic-related generated artwork, such as quantum nodes, robot arms, batteries, DNA, chips, space, or AI networks
 - an in-image quick explainer box for mobile-friendly learning
 - a separate `.caption.txt` file ready to paste into Instagram
 - a `.json` metadata file with source URL, score, and output paths
@@ -82,7 +83,9 @@ output/
   01-ai-breakthrough-gives-robots-a-faster-way-to-learn.json
 ```
 
-The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
+The metadata includes the generated `visual_style` used for the image.
+
+The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. Each image includes deterministic generated artwork related to the story topic, so quantum, robotics, battery, biotech, chip, space, clean-energy, and AI posts do not all look the same. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
 
 ## Notes
 

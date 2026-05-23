@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -27,8 +28,38 @@ class RendererTest(unittest.TestCase):
             self.assertTrue(paths["image"].exists())
             self.assertTrue(paths["caption"].exists())
             self.assertTrue(paths["metadata"].exists())
+            metadata = json.loads(paths["metadata"].read_text(encoding="utf-8"))
+            self.assertEqual(metadata["visual_style"], "robot")
             with Image.open(paths["image"]) as image:
                 self.assertEqual(image.size, CANVAS_SIZE)
+
+    def test_rendered_visuals_change_by_topic(self) -> None:
+        quantum = Article(
+            source="Science Wire",
+            title="Researchers demonstrate quantum chip breakthrough",
+            url="https://example.com/quantum",
+            summary="Scientists built a prototype qubit processor.",
+        )
+        battery = Article(
+            source="Science Wire",
+            title="Scientists unveil solid-state battery breakthrough",
+            url="https://example.com/battery",
+            summary="The prototype battery stores more energy for future devices.",
+        )
+
+        with TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            quantum_paths = render_article_post(quantum, output_dir, index=1)
+            battery_paths = render_article_post(battery, output_dir, index=2)
+
+            quantum_metadata = json.loads(quantum_paths["metadata"].read_text(encoding="utf-8"))
+            battery_metadata = json.loads(battery_paths["metadata"].read_text(encoding="utf-8"))
+            self.assertEqual(quantum_metadata["visual_style"], "quantum")
+            self.assertEqual(battery_metadata["visual_style"], "battery")
+            self.assertNotEqual(
+                quantum_paths["image"].read_bytes(),
+                battery_paths["image"].read_bytes(),
+            )
 
 
 if __name__ == "__main__":
