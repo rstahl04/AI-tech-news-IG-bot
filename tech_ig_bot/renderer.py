@@ -21,26 +21,68 @@ HIGHLIGHT_WORDS = {
     "battery",
     "breakthrough",
     "built",
+    "change",
     "cheaper",
     "chip",
     "chips",
+    "climate",
+    "computer",
     "computers",
+    "computing",
     "dna",
     "energy",
     "faster",
     "future",
+    "human",
     "humanoid",
     "major",
     "muscle",
     "prototype",
     "quantum",
     "record",
+    "revolutionize",
     "robot",
     "robots",
     "scientists",
+    "space",
     "stunned",
     "sunlight",
+    "tech",
+    "technology",
     "touch",
+    "transform",
+}
+HIGHLIGHT_STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "anyway",
+    "be",
+    "by",
+    "can",
+    "could",
+    "for",
+    "from",
+    "good",
+    "in",
+    "is",
+    "it",
+    "just",
+    "new",
+    "next",
+    "of",
+    "on",
+    "or",
+    "set",
+    "the",
+    "this",
+    "to",
+    "vs",
+    "what",
+    "with",
 }
 FONT_CANDIDATES = (
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -195,30 +237,16 @@ def _draw_micro_explainer(draw: ImageDraw.ImageDraw, card_caption: str) -> None:
     font = _font(31)
     text = _first_sentence(card_caption, max_chars=155)
     box = (MARGIN, 1116, CANVAS_SIZE[0] - MARGIN, 1218)
-    _draw_wrapped_highlighted_text(
-        draw,
-        text,
-        box,
-        font,
-        fill="#dbeafe",
-        highlight_fill=HIGHLIGHT_GREEN,
-        line_spacing=5,
-        shadow=True,
-    )
+    _draw_wrapped_text(draw, text, box, font, fill="#dbeafe", line_spacing=5, shadow=True)
 
 
 def _draw_footer(draw: ImageDraw.ImageDraw, article: Article) -> None:
     footer_font = _font(25, bold=True)
     text = "FOLLOW FOR TECH EXPLAINED  /  VERIFY SOURCE BEFORE POSTING"
-    _draw_inline_highlighted_text(
-        draw,
-        text,
-        (MARGIN, 1270),
-        footer_font,
-        fill="#ffffff",
-        highlight_fill=HIGHLIGHT_GREEN,
-        shadow=True,
-    )
+    if True:
+        for offset in ((4, 4), (2, 2), (0, 5)):
+            draw.text((MARGIN + offset[0], 1270 + offset[1]), text, fill=(0, 0, 0), font=footer_font)
+        draw.text((MARGIN, 1270), text, fill="#ffffff", font=footer_font)
 
 
 def _draw_gradient(draw: ImageDraw.ImageDraw) -> None:
@@ -250,6 +278,7 @@ def _draw_wrapped_text(
     max_width = right - left
     lines = _wrap_text(draw, text, font, max_width)
     line_height = _line_height(draw, font) + line_spacing
+    highlight_words = {_normalize_highlight_word(word) for word in _highlighted_words(text)}
 
     y = top
     for line in lines:
@@ -279,6 +308,7 @@ def _draw_wrapped_highlighted_text(
     max_width = right - left
     lines = _wrap_text(draw, text, font, max_width)
     line_height = _line_height(draw, font) + line_spacing
+    highlight_words = {_normalize_highlight_word(word) for word in _highlighted_words(text)}
 
     y = top
     for line in lines:
@@ -290,6 +320,7 @@ def _draw_wrapped_highlighted_text(
                 font,
                 fill=fill,
                 highlight_fill=highlight_fill,
+                highlight_words=highlight_words,
                 shadow=shadow,
             )
             return
@@ -300,6 +331,7 @@ def _draw_wrapped_highlighted_text(
             font,
             fill=fill,
             highlight_fill=highlight_fill,
+            highlight_words=highlight_words,
             shadow=shadow,
         )
         y += line_height
@@ -312,13 +344,14 @@ def _draw_inline_highlighted_text(
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
     fill: str,
     highlight_fill: str,
+    highlight_words: set[str] | None = None,
     shadow: bool = False,
 ) -> None:
     x, y = position
     words = text.split()
     space_width = _text_width(draw, " ", font)
     for index, word in enumerate(words):
-        word_fill = highlight_fill if _is_highlight_word(word) else fill
+        word_fill = highlight_fill if _is_highlight_word(word, highlight_words) else fill
         if shadow:
             for offset in ((4, 4), (2, 2), (0, 5)):
                 draw.text((x + offset[0], y + offset[1]), word, fill=(0, 0, 0), font=font)
@@ -379,16 +412,51 @@ def _first_sentence(value: str, max_chars: int) -> str:
 def _highlighted_words(text: str) -> list[str]:
     words: list[str] = []
     seen: set[str] = set()
+    fallback_candidates: list[str] = []
     for word in text.split():
         normalized = _normalize_highlight_word(word)
-        if normalized in HIGHLIGHT_WORDS and normalized not in seen:
-            words.append(word.strip(".,:;!?()[]{}\"'").strip())
+        cleaned = word.strip(".,:;!?()[]{}\"'").strip()
+        if not cleaned or normalized in seen:
+            continue
+        if normalized in HIGHLIGHT_WORDS:
+            words.append(cleaned)
             seen.add(normalized)
+            continue
+        if _is_fallback_highlight_candidate(cleaned):
+            fallback_candidates.append(cleaned)
+
+    for word in sorted(fallback_candidates, key=_fallback_highlight_score, reverse=True):
+        normalized = _normalize_highlight_word(word)
+        if normalized in seen:
+            continue
+        words.append(word)
+        seen.add(normalized)
+        if len(words) >= 4:
+            break
     return words
 
 
-def _is_highlight_word(word: str) -> bool:
-    return _normalize_highlight_word(word) in HIGHLIGHT_WORDS
+def _is_highlight_word(word: str, highlight_words: set[str] | None = None) -> bool:
+    normalized = _normalize_highlight_word(word)
+    if highlight_words is not None:
+        return normalized in highlight_words
+    return normalized in {_normalize_highlight_word(highlight) for highlight in _highlighted_words(word)}
+
+
+def _is_fallback_highlight_candidate(word: str) -> bool:
+    normalized = _normalize_highlight_word(word)
+    return (
+        len(normalized) >= 5
+        and normalized not in HIGHLIGHT_STOP_WORDS
+        and not normalized.isdigit()
+    )
+
+
+def _fallback_highlight_score(word: str) -> tuple[int, int]:
+    normalized = _normalize_highlight_word(word)
+    title_case_bonus = 2 if word[:1].isupper() else 0
+    length_bonus = min(len(normalized), 12)
+    return (title_case_bonus + length_bonus, len(normalized))
 
 
 def _normalize_highlight_word(word: str) -> str:

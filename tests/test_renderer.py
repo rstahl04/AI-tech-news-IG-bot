@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from PIL import Image
 
 from tech_ig_bot.models import Article
-from tech_ig_bot.renderer import CANVAS_SIZE, render_article_post
+from tech_ig_bot.renderer import CANVAS_SIZE, _highlighted_words, render_article_post
 
 
 class RendererTest(unittest.TestCase):
@@ -63,6 +63,30 @@ class RendererTest(unittest.TestCase):
                 quantum_paths["image"].read_bytes(),
                 battery_paths["image"].read_bytes(),
             )
+
+    def test_headline_highlighting_falls_back_to_strong_words(self) -> None:
+        highlighted = _highlighted_words("What Is a Wormhole Good For Anyway")
+
+        self.assertIn("Wormhole", highlighted)
+        self.assertNotIn("What", highlighted)
+        self.assertNotIn("Anyway", highlighted)
+
+    def test_metadata_highlights_headline_not_description(self) -> None:
+        article = Article(
+            source="Science Wire",
+            title="Prototype sets record for optical quantum information technology",
+            url="https://example.com/simple-quantum",
+            summary="Battery robots scientists sunlight touch.",
+        )
+
+        with TemporaryDirectory() as directory:
+            paths = render_article_post(article, Path(directory), image_mode="procedural")
+            metadata = json.loads(paths["metadata"].read_text(encoding="utf-8"))
+
+        self.assertIn("Prototype", metadata["highlighted_words"])
+        self.assertIn("Quantum", metadata["highlighted_words"])
+        self.assertNotIn("Battery", metadata["highlighted_words"])
+        self.assertNotIn("Robots", metadata["highlighted_words"])
 
 
 if __name__ == "__main__":
