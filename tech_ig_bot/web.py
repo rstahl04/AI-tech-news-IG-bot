@@ -1,0 +1,716 @@
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import logging
+import mimetypes
+import threading
+import time
+import uuid
+from dataclasses import dataclass, field
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, quote, unquote, urlparse
+
+from .caption import make_instagram_caption
+from .fetcher import collect_articles
+from .headline import make_technology_headline
+from .models import Article, FeedSource
+from .ranker import rank_articles
+from .renderer import render_article_post
+from .sources import build_bing_news_feed, default_sources
+
+LOGGER = logging.getLogger(__name__)
+
+MAX_WEB_POSTS = 50
+MAX_WEB_PER_SOURCE = 100
+
+_JOB_LOCK = threading.Lock()
+_JOBS: dict[str, "GenerationJob"] = {}
+
+
+@dataclass(slots=True)
+class WebPost:
+    title: str
+    source: str
+    url: str
+    score: float
+    image_path: Path
+    caption_path: Path
+    metadata_path: Path
+    caption: str
+
+
+@dataclass(slots=True)
+class GenerateOptions:
+    queries: list[str]
+    feeds: list[str]
+    per_source: int
+    top: int
+    enrich: bool
+
+
+@dataclass(slots=True)
+class GenerationJob:
+    id: str
+    options: GenerateOptions
+    output_dir: Path
+    status: str = "queued"
+    message: str = "Queued"
+    total: int = 0
+    completed: int = 0
+    posts: list[WebPost] = field(default_factory=list)
+    error: str = ""
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def update(self, **changes: object) -> None:
+        with self.lock:
+            for key, value in changes.items():
+                setattr(self, key, value)
+            self.updated_at = time.time()
+
+
+def create_generation_job(options: GenerateOptions, output_dir: Path) -> GenerationJob:
+    job = GenerationJob(id=uuid.uuid4().hex[:12], options=options, output_dir=output_dir)
+    with _JOB_LOCK:
+        _JOBS[job.id] = job
+    worker = threading.Thread(target=_run_generation_job, args=(job,), daemon=True)
+    worker.start()
+    return job
+
+
+def get_generation_job(job_id: str) -> GenerationJob | None:
+    with _JOB_LOCK:
+        return _JOBS.get(job_id)
+
+
+def _run_generation_job(job: GenerationJob) -> None:
+    try:
+        job.update(status="collecting", message="Collecting current tech stories...")
+        sources = _build_sources(job.options.queries, job.options.feeds)
+        articles = collect_articles(
+            sources,
+            per_source=job.options.per_source,
+            enrich=job.options.enrich,
+        )
+        ranked = rank_articles(articles, limit=job.options.top)
+        if not ranked:
+            job.update(status="failed", message="No articles discovered", error="Try a custom topic or RSS feed.")
+            return
+
+        run_dir = job.output_dir / "web" / _next_run_name(job.output_dir / "web")
+        job.update(status="generating", total=len(ranked), completed=0, message="Starting image generation...")
+        for index, article in enumerate(ranked, start=1):
+            headline = make_technology_headline(article)
+            job.update(message=f"Generating {index}/{len(ranked)}: {headline}")
+            paths = render_article_post(article, output_dir=run_dir, index=index)
+            post = _web_post_from_article(article, paths)
+            with job.lock:
+                job.posts.append(post)
+                job.completed = index
+                job.updated_at = time.time()
+        job.update(status="completed", message=f"Generated {len(ranked)} post asset sets.")
+    except Exception as exc:  # pragma: no cover - thread safety net.
+        LOGGER.exception("Generation job failed")
+        job.update(status="failed", message="Generation failed", error=str(exc))
+
+
+def generation_job_payload(job: GenerationJob, output_dir: Path) -> dict[str, object]:
+    with job.lock:
+        posts = list(job.posts)
+        total = job.total
+        completed = job.completed
+        status = job.status
+        message = job.message
+        error = job.error
+    return {
+        "id": job.id,
+        "status": status,
+        "message": message,
+        "error": error,
+        "completed": completed,
+        "total": total,
+        "percent": int((completed / total) * 100) if total else 0,
+        "posts_html": "\n".join(_render_post_card(post, output_dir) for post in posts),
+    }
+
+
+def parse_generate_options(form_body: str) -> GenerateOptions:
+    values = parse_qs(form_body, keep_blank_values=True)
+    queries = _lines(values.get("query", [""])[0])
+    feeds = _lines(values.get("feed", [""])[0])
+    per_source = _bounded_int(values.get("per_source", ["8"])[0], default=8, low=1, high=MAX_WEB_PER_SOURCE)
+    top = _bounded_int(values.get("top", ["1"])[0], default=1, low=1, high=MAX_WEB_POSTS)
+    enrich = values.get("enrich", [""])[0] == "on"
+    return GenerateOptions(
+        queries=queries,
+        feeds=feeds,
+        per_source=per_source,
+        top=top,
+        enrich=enrich,
+    )
+
+
+def generate_posts(options: GenerateOptions, output_dir: Path) -> list[WebPost]:
+    sources = _build_sources(options.queries, options.feeds)
+    articles = collect_articles(
+        sources,
+        per_source=options.per_source,
+        enrich=options.enrich,
+    )
+    ranked = rank_articles(articles, limit=options.top)
+    if not ranked:
+        return []
+
+    run_dir = output_dir / "web" / _next_run_name(output_dir / "web")
+    posts: list[WebPost] = []
+    for index, article in enumerate(ranked, start=1):
+        paths = render_article_post(article, output_dir=run_dir, index=index)
+        posts.append(_web_post_from_article(article, paths))
+    return posts
+
+
+def _web_post_from_article(article: Article, paths: dict[str, Path]) -> WebPost:
+    return WebPost(
+        title=make_technology_headline(article),
+        source=article.source,
+        url=article.url,
+        score=article.score,
+        image_path=paths["image"],
+        caption_path=paths["caption"],
+        metadata_path=paths["metadata"],
+        caption=make_instagram_caption(article),
+    )
+
+
+def load_recent_posts(output_dir: Path, limit: int = 12) -> list[WebPost]:
+    web_root = output_dir / "web"
+    if not web_root.exists():
+        return []
+
+    metadata_files = sorted(
+        web_root.glob("**/*.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+    posts: list[WebPost] = []
+    for metadata_path in metadata_files[:limit]:
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        image_path = metadata_path.with_suffix(".png")
+        caption_path = metadata_path.with_suffix(".caption.txt")
+        if not image_path.exists() or not caption_path.exists():
+            continue
+
+        posts.append(
+            WebPost(
+                title=str(metadata.get("title", image_path.stem)),
+                source=str(metadata.get("source", "")),
+                url=str(metadata.get("url", "")),
+                score=float(metadata.get("score", 0.0)),
+                image_path=image_path,
+                caption_path=caption_path,
+                metadata_path=metadata_path,
+                caption=caption_path.read_text(encoding="utf-8").strip(),
+            )
+        )
+    return posts
+
+
+def render_index(
+    posts: list[WebPost],
+    output_dir: Path,
+    notice: str = "",
+    error: str = "",
+) -> str:
+    post_cards = "\n".join(_render_post_card(post, output_dir) for post in posts)
+    if not post_cards:
+        post_cards = """
+        <section class="empty">
+          <h2>No posts generated yet</h2>
+          <p>Use the form to create viral-style technology explainers from real current news.</p>
+        </section>
+        """
+
+    notice_html = f'<div class="notice">{html.escape(notice)}</div>' if notice else ""
+    error_html = f'<div class="error">{html.escape(error)}</div>' if error else ""
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Tech News Instagram Bot</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #08111f;
+      --panel: #111c33;
+      --text: #f8fafc;
+      --muted: #aab6ce;
+      --accent: #00f5d4;
+      --accent-2: #7c3aed;
+      --danger: #fda4af;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(124, 58, 237, 0.35), transparent 35rem),
+        radial-gradient(circle at 10% 20%, rgba(0, 245, 212, 0.20), transparent 28rem),
+        var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }}
+    main {{ width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 44px 0 64px; }}
+    header {{ margin-bottom: 28px; }}
+    .eyebrow {{ color: var(--accent); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }}
+    h1 {{ margin: 10px 0 12px; font-size: clamp(2.2rem, 5vw, 4.5rem); line-height: 0.96; }}
+    .subtitle {{ color: var(--muted); max-width: 760px; font-size: 1.12rem; line-height: 1.6; }}
+    .layout {{ display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 24px; align-items: start; }}
+    .panel, .card, .empty {{
+      background: rgba(17, 28, 51, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+    }}
+    .panel {{ padding: 24px; position: sticky; top: 24px; }}
+    label {{ display: block; color: #dbeafe; font-weight: 750; margin: 18px 0 8px; }}
+    textarea, input {{
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      background: rgba(8, 17, 31, 0.88);
+      color: var(--text);
+      padding: 13px 14px;
+      font: inherit;
+      font-size: 16px;
+    }}
+    textarea {{ min-height: 96px; resize: vertical; }}
+    .row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
+    .checkbox {{ display: flex; gap: 10px; align-items: center; margin-top: 18px; color: var(--muted); }}
+    .checkbox input {{ width: auto; }}
+    button, .button {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #06111f;
+      font-weight: 850;
+      padding: 13px 18px;
+      cursor: pointer;
+      text-decoration: none;
+      font: inherit;
+    }}
+    button.primary {{ width: 100%; margin-top: 22px; font-size: 1.03rem; }}
+    .notice, .error {{ margin-bottom: 18px; padding: 14px 16px; border-radius: 18px; }}
+    .notice {{ background: rgba(0, 245, 212, 0.12); color: #bffdf3; }}
+    .error {{ background: rgba(253, 164, 175, 0.14); color: var(--danger); }}
+    .results {{ display: grid; gap: 22px; }}
+    .card {{ display: grid; grid-template-columns: minmax(220px, 340px) 1fr; gap: 22px; padding: 20px; }}
+    .card img {{ width: 100%; max-height: 520px; object-fit: cover; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); }}
+    .meta {{ color: var(--accent); font-size: 0.88rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }}
+    .card h2 {{ margin: 8px 0 8px; font-size: clamp(1.35rem, 2.3vw, 2rem); }}
+    .source {{ color: var(--muted); margin-bottom: 14px; }}
+    .caption {{
+      width: 100%;
+      min-height: 190px;
+      white-space: pre-wrap;
+      color: #e5edf9;
+      background: rgba(8, 17, 31, 0.65);
+      border-radius: 18px;
+      padding: 14px;
+      line-height: 1.5;
+      overflow: auto;
+    }}
+    .actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }}
+    .secondary {{ background: rgba(255, 255, 255, 0.12); color: var(--text); }}
+    .empty {{ padding: 34px; color: var(--muted); }}
+    @media (max-width: 900px) {{
+      main {{ width: min(100% - 20px, 1180px); padding-top: 24px; }}
+      h1 {{ font-size: clamp(2rem, 11vw, 3.1rem); }}
+      .layout, .card, .row {{ grid-template-columns: 1fr; }}
+      .panel {{ position: static; padding: 18px; border-radius: 22px; }}
+      .card {{ padding: 14px; gap: 14px; border-radius: 22px; }}
+      .card img {{ max-height: none; }}
+      .actions .button, .actions button {{ width: 100%; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Viral Tech Explainers</div>
+      <h1>Turn current tech news into viral explainer posts.</h1>
+      <p class="subtitle">
+        Scrape public technology feeds, find expert/research-backed stories, and create a
+        scroll-stopping image plus a caption that explains why people should care.
+      </p>
+    </header>
+    {notice_html}
+    {error_html}
+    <section class="layout">
+      <form class="panel" method="post" action="/generate">
+        <h2>Create a viral tech post</h2>
+        <label for="query">Extra search topics, one per line</label>
+        <textarea id="query" name="query" placeholder="experts say new AI breakthrough&#10;scientists developed battery technology"></textarea>
+        <label for="feed">Extra RSS feeds, one per line</label>
+        <textarea id="feed" name="feed" placeholder="https://example.com/rss.xml"></textarea>
+        <div class="row">
+          <div>
+            <label for="top">Posts to generate</label>
+            <input id="top" name="top" type="number" min="1" max="50" value="1">
+          </div>
+          <div>
+            <label for="per_source">Stories per source</label>
+            <input id="per_source" name="per_source" type="number" min="1" max="100" value="8">
+          </div>
+        </div>
+        <label class="checkbox">
+          <input type="checkbox" name="enrich">
+          Fetch article pages for richer captions. This is slower. Generating many AI images can also take a while.
+        </label>
+        <button class="primary" type="submit">Generate viral tech assets</button>
+      </form>
+      <section class="results">
+        {post_cards}
+      </section>
+    </section>
+  </main>
+  <script>
+    async function copyCaption(id) {{
+      const text = document.getElementById(id).innerText;
+      await navigator.clipboard.writeText(text);
+      const button = document.querySelector(`[data-copy="${{id}}"]`);
+      const old = button.innerText;
+      button.innerText = "Copied";
+      setTimeout(() => button.innerText = old, 1200);
+    }}
+  </script>
+</body>
+</html>"""
+
+
+def render_job_page(job: GenerationJob) -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generating posts</title>
+  <style>
+    :root {{ color-scheme: dark; --bg: #08111f; --panel: #111c33; --text: #f8fafc; --muted: #aab6ce; --accent: #00f5d4; --danger: #fda4af; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; overflow-x: hidden; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at top right, rgba(124, 58, 237, 0.35), transparent 35rem), var(--bg); color: var(--text); }}
+    main {{ width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 44px 0 64px; }}
+    a {{ color: inherit; }}
+    .panel, .card {{ background: rgba(17, 28, 51, 0.88); border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 28px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26); }}
+    .panel {{ padding: 24px; margin-bottom: 24px; }}
+    .topline {{ color: var(--accent); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }}
+    h1 {{ margin: 10px 0 8px; font-size: clamp(2rem, 5vw, 4rem); line-height: .98; }}
+    .muted {{ color: var(--muted); }}
+    .progress-wrap {{ margin: 22px 0 10px; height: 20px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }}
+    .progress-bar {{ height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #7c3aed); transition: width .4s ease; }}
+    .status-row {{ display: flex; justify-content: space-between; gap: 16px; color: var(--muted); }}
+    .results {{ display: grid; gap: 22px; }}
+    .card {{ display: grid; grid-template-columns: minmax(220px, 340px) 1fr; gap: 22px; padding: 20px; animation: pop .25s ease; }}
+    .card img {{ width: 100%; max-height: 520px; object-fit: cover; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); }}
+    .meta {{ color: var(--accent); font-size: .88rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }}
+    .card h2 {{ margin: 8px 0; font-size: clamp(1.35rem, 2.3vw, 2rem); }}
+    .source {{ color: var(--muted); margin-bottom: 14px; }}
+    .caption {{ width: 100%; min-height: 190px; white-space: pre-wrap; color: #e5edf9; background: rgba(8, 17, 31, .65); border-radius: 18px; padding: 14px; line-height: 1.5; overflow: auto; }}
+    .actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }}
+    button, .button {{ display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--accent); color: #06111f; font-weight: 850; padding: 13px 18px; cursor: pointer; text-decoration: none; font: inherit; }}
+    .secondary {{ background: rgba(255, 255, 255, .12); color: var(--text); }}
+    .error {{ color: var(--danger); }}
+    @keyframes pop {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+    @media (max-width: 900px) {{ main {{ width: min(100% - 20px, 1180px); padding-top: 24px; }} .panel {{ padding: 18px; border-radius: 22px; }} .card {{ grid-template-columns: 1fr; padding: 14px; gap: 14px; border-radius: 22px; }} .card img {{ max-height: none; }} .actions .button, .actions button {{ width: 100%; }} }}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <div class="topline">Generating batch</div>
+      <h1>Your posts are being made one at a time.</h1>
+      <p class="muted">You can download or copy each post as soon as it appears. Keep this page open while the rest finish.</p>
+      <div class="progress-wrap"><div id="progress-bar" class="progress-bar"></div></div>
+      <div class="status-row">
+        <span id="message">Queued</span>
+        <strong id="count">0 / 0</strong>
+      </div>
+      <p id="error" class="error"></p>
+      <p><a class="button secondary" href="/">Start another batch</a></p>
+    </section>
+    <section id="results" class="results"></section>
+  </main>
+  <script>
+    const jobId = "{job.id}";
+    async function copyCaption(id) {{
+      const text = document.getElementById(id).innerText;
+      await navigator.clipboard.writeText(text);
+      const button = document.querySelector(`[data-copy="${{id}}"]`);
+      const old = button.innerText;
+      button.innerText = "Copied";
+      setTimeout(() => button.innerText = old, 1200);
+    }}
+    async function poll() {{
+      try {{
+        const response = await fetch(`/job/${{jobId}}/status`, {{cache: "no-store"}});
+        const data = await response.json();
+        document.getElementById("progress-bar").style.width = `${{data.percent}}%`;
+        document.getElementById("message").innerText = data.message || data.status;
+        document.getElementById("count").innerText = `${{data.completed}} / ${{data.total || "?"}}`;
+        document.getElementById("results").innerHTML = data.posts_html || "";
+        document.getElementById("error").innerText = data.error || "";
+        if (!["completed", "failed"].includes(data.status)) {{
+          setTimeout(poll, 1800);
+        }}
+      }} catch (error) {{
+        document.getElementById("message").innerText = "Connection hiccup. Retrying...";
+        setTimeout(poll, 2500);
+      }}
+    }}
+    poll();
+  </script>
+</body>
+</html>"""
+
+
+class TechNewsHandler(BaseHTTPRequestHandler):
+    output_dir = Path("output")
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/":
+            posts = load_recent_posts(self.output_dir)
+            self._send_html(render_index(posts, self.output_dir))
+            return
+        if parsed.path.startswith("/job/") and parsed.path.endswith("/status"):
+            job_id = parsed.path.removeprefix("/job/").removesuffix("/status").strip("/")
+            job = get_generation_job(job_id)
+            if job is None:
+                self.send_error(HTTPStatus.NOT_FOUND, "Generation job not found")
+                return
+            self._send_json(generation_job_payload(job, self.output_dir))
+            return
+        if parsed.path.startswith("/job/"):
+            job_id = parsed.path.removeprefix("/job/").strip("/")
+            job = get_generation_job(job_id)
+            if job is None:
+                self.send_error(HTTPStatus.NOT_FOUND, "Generation job not found")
+                return
+            self._send_html(render_job_page(job))
+            return
+        if parsed.path.startswith("/generated/"):
+            self._send_generated_file(parsed.path.removeprefix("/generated/"))
+            return
+        self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path != "/generate":
+            self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+            return
+
+        body = self.rfile.read(_content_length(self.headers.get("Content-Length"))).decode(
+            "utf-8",
+            errors="replace",
+        )
+        try:
+            options = parse_generate_options(body)
+            job = create_generation_job(options, self.output_dir)
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", f"/job/{job.id}")
+            self.end_headers()
+            return
+        except Exception as exc:  # pragma: no cover - keeps browser errors friendly.
+            LOGGER.exception("Generation failed")
+            page = render_index(
+                load_recent_posts(self.output_dir),
+                self.output_dir,
+                error=f"Generation failed: {exc}",
+            )
+            self._send_html(page)
+
+    def log_message(self, format: str, *args: object) -> None:
+        LOGGER.info("%s - %s", self.address_string(), format % args)
+
+    def _send_html(self, body: str) -> None:
+        encoded = body.encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _send_json(self, payload: dict[str, object]) -> None:
+        encoded = json.dumps(payload).encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _send_generated_file(self, relative_url_path: str) -> None:
+        relative_path = Path(unquote(relative_url_path))
+        root = self.output_dir.resolve()
+        file_path = (root / relative_path).resolve()
+        if not _is_relative_to(file_path, root) or not file_path.is_file():
+            self.send_error(HTTPStatus.NOT_FOUND, "Generated file not found")
+            return
+
+        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        data = file_path.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+def run_server(host: str, port: int, output_dir: Path) -> None:
+    handler_class = type(
+        "ConfiguredTechNewsHandler",
+        (TechNewsHandler,),
+        {"output_dir": output_dir},
+    )
+    server = ThreadingHTTPServer((host, port), handler_class)
+    print(f"Open http://{host}:{port} in your browser")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopping server")
+    finally:
+        server.server_close()
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the Tech News Instagram Bot website.")
+    parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind.")
+    parser.add_argument("--port", type=int, default=8000, help="Port to listen on.")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("output"),
+        help="Directory where generated web assets are written.",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=("DEBUG", "INFO", "WARNING", "ERROR"),
+        help="Logging verbosity.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=getattr(logging, args.log_level), format="%(levelname)s: %(message)s")
+    run_server(args.host, args.port, args.output_dir)
+    return 0
+
+
+def _render_post_card(post: WebPost, output_dir: Path) -> str:
+    caption_id = "caption-" + quote(post.metadata_path.stem, safe="")
+    image_url = _generated_url(post.image_path, output_dir)
+    caption_url = _generated_url(post.caption_path, output_dir)
+    metadata_url = _generated_url(post.metadata_path, output_dir)
+    title = html.escape(post.title)
+    source = html.escape(post.source)
+    article_url = html.escape(post.url)
+    caption = html.escape(post.caption)
+    source_link = (
+        f'<a class="button secondary" href="{article_url}" target="_blank" rel="noreferrer">Open source</a>'
+        if article_url
+        else ""
+    )
+
+    return f"""
+    <article class="card">
+      <a href="{image_url}" target="_blank"><img src="{image_url}" alt="{title}"></a>
+      <div>
+        <div class="meta">Score {post.score:.2f}</div>
+        <h2>{title}</h2>
+        <div class="source">{source}</div>
+        <div id="{caption_id}" class="caption">{caption}</div>
+        <div class="actions">
+          <button class="secondary" type="button" data-copy="{caption_id}" onclick="copyCaption('{caption_id}')">Copy caption</button>
+          <a class="button" href="{image_url}" download>Download image</a>
+          <a class="button secondary" href="{caption_url}" download>Download caption</a>
+          <a class="button secondary" href="{metadata_url}" download>Metadata</a>
+          {source_link}
+        </div>
+      </div>
+    </article>
+    """
+
+
+def _build_sources(queries: list[str], feeds: list[str]) -> list[FeedSource]:
+    sources = default_sources(include_news_search=True)
+    sources.extend(build_bing_news_feed(query) for query in queries)
+    sources.extend(
+        FeedSource(name=f"Custom feed {index}", url=url)
+        for index, url in enumerate(feeds, start=1)
+    )
+    return sources
+
+
+def _lines(value: str) -> list[str]:
+    return [line.strip() for line in value.splitlines() if line.strip()]
+
+
+def _bounded_int(value: str, default: int, low: int, high: int) -> int:
+    try:
+        parsed = int(value)
+    except ValueError:
+        return default
+    return min(max(parsed, low), high)
+
+
+def _next_run_name(root: Path) -> str:
+    root.mkdir(parents=True, exist_ok=True)
+    existing = [
+        int(path.name.removeprefix("run-"))
+        for path in root.glob("run-*")
+        if path.name.removeprefix("run-").isdigit()
+    ]
+    return f"run-{(max(existing) if existing else 0) + 1:04d}"
+
+
+def _generated_url(path: Path, output_dir: Path) -> str:
+    relative = path.resolve().relative_to(output_dir.resolve())
+    return "/generated/" + quote(relative.as_posix())
+
+
+def _content_length(value: str | None) -> int:
+    if value is None:
+        return 0
+    try:
+        return max(int(value), 0)
+    except ValueError:
+        return 0
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

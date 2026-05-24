@@ -1,1 +1,150 @@
-# AI-tech-news-IG-bot
+# AI Tech News Instagram Bot
+
+This project discovers current technology and science stories from public RSS/news
+feeds, favors expert/research-backed breakthroughs, and turns them into Instagram-ready
+posts modeled after viral educational technology pages:
+
+- a 1080x1350 PNG with a scroll-stopping technology headline
+- AI-generated topic artwork related to the headline, with an offline procedural fallback
+- an in-image quick explainer box for mobile-friendly learning
+- a separate `.caption.txt` file ready to paste into Instagram
+- a `.json` metadata file with source URL, score, and output paths
+
+## Install
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+```
+
+## Generate a post
+
+```bash
+tech-ig-bot --top 3 --output-dir output
+```
+
+Generate 10 posts at once:
+
+```bash
+tech-ig-bot --top 10 --per-source 8 --output-dir output
+```
+
+The default run scans curated technology/science feeds plus Bing News RSS queries
+for topics such as AI, robotics, quantum computing, batteries, fusion, expert
+commentary, research prototypes, and other emerging technologies.
+
+Add your own discovery terms or RSS feeds:
+
+```bash
+tech-ig-bot \
+  --query "space propulsion breakthrough" \
+  --query "humanoid robot prototype" \
+  --feed "https://example.com/rss.xml" \
+  --top 2
+```
+
+Preview ranked stories without creating images:
+
+```bash
+tech-ig-bot --dry-run --no-enrich
+```
+
+Generate without external AI image generation, using the offline fallback instead:
+
+```bash
+tech-ig-bot --image-mode procedural --top 10 --per-source 8 --output-dir output
+```
+
+## Use the website
+
+Start the local website:
+
+```bash
+python3 -m tech_ig_bot.web
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000
+```
+
+The website works on desktop and mobile, and lets you:
+
+- enter extra search topics or RSS feeds
+- choose how many Instagram posts to generate, up to 50 per website batch
+- watch a progress bar while the batch runs in the background
+- preview and download each generated post as soon as it finishes
+- copy the long caption
+- download the PNG, caption text, and metadata
+
+For larger batches, increase "Posts to generate" in the website. Use "Stories per source" to control how many candidates are scanned before ranking; generating 10 posts usually works well with 8 or more stories per source. The website starts a background job, shows a progress bar, and displays each post as soon as it is ready. AI image generation is one request per post, so bigger batches take longer.
+
+If you installed the package, you can also start it with:
+
+```bash
+tech-ig-bot-web
+```
+
+
+## Deploy for a permanent link
+
+Temporary tunnel links can time out. For a more permanent public URL, deploy the
+app as a web service. This repo includes a `Dockerfile` and `render.yaml` for
+Render.
+
+Render steps:
+
+1. Push this branch to GitHub.
+2. Go to Render and create a new Blueprint or Web Service from this repository.
+3. Render will detect `render.yaml` / `Dockerfile`.
+4. Deploy it.
+5. Use the generated Render URL, for example:
+
+```text
+https://ai-tech-news-ig-bot.onrender.com
+```
+
+The deployed service runs the same website and supports background batch jobs,
+progress updates, generated images, and downloads.
+
+Notes:
+
+- AI image generation is one external request per post, so large batches can take
+  a while.
+- Generated files are stored on the service filesystem. For long-term storage,
+  add persistent disk or object storage later.
+- You can also deploy the Dockerfile to another host that supports containers.
+
+## Output
+
+For each selected story, the bot writes files like:
+
+```text
+output/
+  01-ai-breakthrough-gives-robots-a-faster-way-to-learn.png
+  01-ai-breakthrough-gives-robots-a-faster-way-to-learn.caption.txt
+  01-ai-breakthrough-gives-robots-a-faster-way-to-learn.json
+```
+
+The metadata includes `image_provider`, `image_prompt`, and `visual_style` so you can see whether the post used AI image generation or the fallback renderer.
+
+The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. Each image uses an AI image-generation request related to the story topic and headline with a consistent editorial tech style, so quantum, robotics, battery, biotech, chip, space, clean-energy, and AI posts do not all look the same but still feel like one account. If one image model fails, the app retries another model; if the image service is unavailable, the renderer falls back to deterministic procedural artwork. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
+
+## Notes
+
+- The scraper uses public RSS/Atom feeds and article pages. Some publishers may
+  block automated requests or provide short summaries only.
+- The ranking heuristic favors expert/research signals, breakthroughs, prototypes,
+  records, AI, robotics, quantum computing, batteries, energy, biotech, and space,
+  while pushing down acquisitions, awards, marketing posts, weak event listings, and unrelated gaming/news noise.
+- Batch generation dedupes repeated URLs, syndicated versions of the same story,
+  and repeated generated headlines, then spreads selections across broad tech topics.
+- Always verify the generated copy and source article before posting.
+
+## Tests
+
+```bash
+python3 -m unittest discover -s tests
+```
