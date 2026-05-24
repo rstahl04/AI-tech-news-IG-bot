@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from urllib.error import URLError
+from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
@@ -70,16 +71,41 @@ def collect_articles(
     enrich: bool = True,
 ) -> list[Article]:
     articles: list[Article] = []
-    seen_urls: set[str] = set()
+    seen_keys: set[str] = set()
 
     for source in sources:
         for article in fetch_feed(source, per_source=per_source):
-            if article.url in seen_urls:
+            key = _article_dedupe_key(article)
+            if key in seen_keys:
                 continue
-            seen_urls.add(article.url)
+            seen_keys.add(key)
             articles.append(fetch_article_content(article) if enrich else article)
 
     return articles
+
+
+def _article_dedupe_key(article: Article) -> str:
+    canonical_url = _canonical_url(article.url)
+    if canonical_url:
+        return f"url:{canonical_url}"
+    return f"title:{_normalized_title(article.title)}"
+
+
+def _canonical_url(url: str) -> str:
+    if not url:
+        return ""
+
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    if parsed.netloc.endswith("bing.com") and "url" in query:
+        return _canonical_url(unquote(query["url"][0]))
+
+    clean_path = parsed.path.rstrip("/")
+    return f"{parsed.netloc.lower()}{clean_path}".lower()
+
+
+def _normalized_title(title: str) -> str:
+    return " ".join(clean_text(title).lower().split())
 
 
 def _parse_rss_item(entry: ElementTree.Element, source_name: str) -> Article | None:

@@ -269,6 +269,7 @@ def render_index(
         radial-gradient(circle at 10% 20%, rgba(0, 245, 212, 0.20), transparent 28rem),
         var(--bg);
       color: var(--text);
+      overflow-x: hidden;
     }}
     main {{ width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 44px 0 64px; }}
     header {{ margin-bottom: 28px; }}
@@ -292,6 +293,7 @@ def render_index(
       color: var(--text);
       padding: 13px 14px;
       font: inherit;
+      font-size: 16px;
     }}
     textarea {{ min-height: 96px; resize: vertical; }}
     .row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
@@ -318,7 +320,7 @@ def render_index(
     .error {{ background: rgba(253, 164, 175, 0.14); color: var(--danger); }}
     .results {{ display: grid; gap: 22px; }}
     .card {{ display: grid; grid-template-columns: minmax(220px, 340px) 1fr; gap: 22px; padding: 20px; }}
-    .card img {{ width: 100%; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); }}
+    .card img {{ width: 100%; max-height: 520px; object-fit: cover; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); }}
     .meta {{ color: var(--accent); font-size: 0.88rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }}
     .card h2 {{ margin: 8px 0 8px; font-size: clamp(1.35rem, 2.3vw, 2rem); }}
     .source {{ color: var(--muted); margin-bottom: 14px; }}
@@ -337,8 +339,13 @@ def render_index(
     .secondary {{ background: rgba(255, 255, 255, 0.12); color: var(--text); }}
     .empty {{ padding: 34px; color: var(--muted); }}
     @media (max-width: 900px) {{
-      .layout, .card {{ grid-template-columns: 1fr; }}
-      .panel {{ position: static; }}
+      main {{ width: min(100% - 20px, 1180px); padding-top: 24px; }}
+      h1 {{ font-size: clamp(2rem, 11vw, 3.1rem); }}
+      .layout, .card, .row {{ grid-template-columns: 1fr; }}
+      .panel {{ position: static; padding: 18px; border-radius: 22px; }}
+      .card {{ padding: 14px; gap: 14px; border-radius: 22px; }}
+      .card img {{ max-height: none; }}
+      .actions .button, .actions button {{ width: 100%; }}
     }}
   </style>
 </head>
@@ -406,7 +413,7 @@ def render_job_page(job: GenerationJob) -> str:
   <style>
     :root {{ color-scheme: dark; --bg: #08111f; --panel: #111c33; --text: #f8fafc; --muted: #aab6ce; --accent: #00f5d4; --danger: #fda4af; }}
     * {{ box-sizing: border-box; }}
-    body {{ margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at top right, rgba(124, 58, 237, 0.35), transparent 35rem), var(--bg); color: var(--text); }}
+    body {{ margin: 0; overflow-x: hidden; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at top right, rgba(124, 58, 237, 0.35), transparent 35rem), var(--bg); color: var(--text); }}
     main {{ width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 44px 0 64px; }}
     a {{ color: inherit; }}
     .panel, .card {{ background: rgba(17, 28, 51, 0.88); border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 28px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26); }}
@@ -419,7 +426,7 @@ def render_job_page(job: GenerationJob) -> str:
     .status-row {{ display: flex; justify-content: space-between; gap: 16px; color: var(--muted); }}
     .results {{ display: grid; gap: 22px; }}
     .card {{ display: grid; grid-template-columns: minmax(220px, 340px) 1fr; gap: 22px; padding: 20px; animation: pop .25s ease; }}
-    .card img {{ width: 100%; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); }}
+    .card img {{ width: 100%; max-height: 520px; object-fit: cover; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); }}
     .meta {{ color: var(--accent); font-size: .88rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }}
     .card h2 {{ margin: 8px 0; font-size: clamp(1.35rem, 2.3vw, 2rem); }}
     .source {{ color: var(--muted); margin-bottom: 14px; }}
@@ -429,7 +436,7 @@ def render_job_page(job: GenerationJob) -> str:
     .secondary {{ background: rgba(255, 255, 255, .12); color: var(--text); }}
     .error {{ color: var(--danger); }}
     @keyframes pop {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-    @media (max-width: 900px) {{ .card {{ grid-template-columns: 1fr; }} }}
+    @media (max-width: 900px) {{ main {{ width: min(100% - 20px, 1180px); padding-top: 24px; }} .panel {{ padding: 18px; border-radius: 22px; }} .card {{ grid-template-columns: 1fr; padding: 14px; gap: 14px; border-radius: 22px; }} .card img {{ max-height: none; }} .actions .button, .actions button {{ width: 100%; }} }}
   </style>
 </head>
 <body>

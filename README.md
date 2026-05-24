@@ -70,7 +70,7 @@ Then open:
 http://127.0.0.1:8000
 ```
 
-The website lets you:
+The website works on desktop and mobile, and lets you:
 
 - enter extra search topics or RSS feeds
 - choose how many Instagram posts to generate, up to 50 per website batch
@@ -130,7 +130,7 @@ output/
 
 The metadata includes `image_provider`, `image_prompt`, and `visual_style` so you can see whether the post used AI image generation or the fallback renderer.
 
-The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. Each image uses an AI image-generation request related to the story topic and headline, so quantum, robotics, battery, biotech, chip, space, clean-energy, and AI posts do not all look the same. If the image service is unavailable, the renderer falls back to deterministic procedural artwork. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
+The PNG is designed for Instagram portrait posts with a viral, learn-something-new technology explainer style. Each image uses an AI image-generation request related to the story topic and headline with a consistent editorial tech style, so quantum, robotics, battery, biotech, chip, space, clean-energy, and AI posts do not all look the same but still feel like one account. If one image model fails, the app retries another model; if the image service is unavailable, the renderer falls back to deterministic procedural artwork. The separate caption file contains a follow-style hook, plain-language explanation, source attribution, and hashtags such as #technology and #reels.
 
 ## Notes
 
@@ -138,7 +138,9 @@ The PNG is designed for Instagram portrait posts with a viral, learn-something-n
   block automated requests or provide short summaries only.
 - The ranking heuristic favors expert/research signals, breakthroughs, prototypes,
   records, AI, robotics, quantum computing, batteries, energy, biotech, and space,
-  while pushing down acquisitions, awards, marketing posts, and unrelated gaming/news noise.
+  while pushing down acquisitions, awards, marketing posts, weak event listings, and unrelated gaming/news noise.
+- Batch generation dedupes repeated URLs, syndicated versions of the same story,
+  and repeated generated headlines, then spreads selections across broad tech topics.
 - Always verify the generated copy and source article before posting.
 
 ## Tests

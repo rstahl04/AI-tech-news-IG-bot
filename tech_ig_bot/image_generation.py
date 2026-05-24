@@ -15,6 +15,7 @@ from .models import Article
 LOGGER = logging.getLogger(__name__)
 
 POLLINATIONS_BASE_URL = "https://image.pollinations.ai/prompt/"
+IMAGE_MODELS = ("flux", "turbo")
 
 PROMPT_TEMPLATES: dict[str, str] = {
     "AI body maps": (
@@ -101,28 +102,31 @@ def generate_story_image(
 
     prompt = build_image_prompt(article, headline)
     seed = _seed(article, headline)
-    params = urlencode(
-        {
-            "width": size[0],
-            "height": size[1],
-            "model": "flux",
-            "nologo": "true",
-            "private": "true",
-            "enhance": "true",
-            "seed": seed,
-            "negative": NEGATIVE_PROMPT,
-        }
-    )
-    url = f"{POLLINATIONS_BASE_URL}{quote_plus(prompt)}?{params}"
-    try:
-        request = Request(url, headers={"User-Agent": "TechInstagramBot/0.1"})
-        with urlopen(request, timeout=timeout) as response:  # noqa: S310 - intentional image service call.
-            data = response.read()
-        image = Image.open(BytesIO(data)).convert("RGB")
-        return image.resize(size, Image.Resampling.LANCZOS), "pollinations", prompt
-    except (OSError, URLError) as exc:
-        LOGGER.warning("AI image generation failed, falling back to procedural art: %s", exc)
-        return None, "procedural-fallback", prompt
+    for model in IMAGE_MODELS:
+        params = urlencode(
+            {
+                "width": size[0],
+                "height": size[1],
+                "model": model,
+                "nologo": "true",
+                "enhance": "true",
+                "seed": seed,
+                "negative": NEGATIVE_PROMPT,
+            }
+        )
+        url = f"{POLLINATIONS_BASE_URL}{quote_plus(prompt)}?{params}"
+        try:
+            request = Request(url, headers={"User-Agent": "TechInstagramBot/0.1"})
+            with urlopen(request, timeout=timeout) as response:  # noqa: S310 - intentional image service call.
+                data = response.read()
+            image = Image.open(BytesIO(data)).convert("RGB")
+            return image.resize(size, Image.Resampling.LANCZOS), f"pollinations:{model}", prompt
+        except (OSError, URLError) as exc:
+            LOGGER.warning("AI image generation failed with %s: %s", model, exc)
+            continue
+
+    LOGGER.warning("All AI image models failed, falling back to procedural art")
+    return None, "procedural-fallback", prompt
 
 
 def build_image_prompt(article: Article, headline: str) -> str:
@@ -131,7 +135,8 @@ def build_image_prompt(article: Article, headline: str) -> str:
     return (
         f"{visual}. Inspired by this news hook: {headline}. "
         "Instagram reels cover image, vertical 4:5 composition, strong focal point, "
-        "high contrast, modern, no text, no logos, no watermark."
+        "high contrast, modern, cinematic teal and neon green color accents, "
+        "consistent editorial tech style, no text, no logos, no watermark."
     )
 
 

@@ -18,6 +18,7 @@ class ImageGenerationTest(unittest.TestCase):
         self.assertIn("quantum", prompt.lower())
         self.assertIn("no text", prompt.lower())
         self.assertIn("no logos", prompt.lower())
+        self.assertIn("consistent editorial tech style", prompt.lower())
 
 
 if __name__ == "__main__":

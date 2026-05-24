@@ -75,6 +75,69 @@ class RankerCaptionTest(unittest.TestCase):
         self.assertIs(ranked[1], unique)
         self.assertIs(ranked[2], duplicate_hook)
 
+    def test_ranker_spreads_batch_across_tech_topics(self) -> None:
+        ai_1 = Article("Example", "AI prototype breakthrough for office workflows", "https://example.com/ai-1", summary="Researchers demonstrated artificial intelligence.")
+        ai_2 = Article("Example", "New AI system could transform engineering", "https://example.com/ai-2", summary="Researchers built an artificial intelligence prototype.")
+        battery = Article("Example", "Scientists unveil solid-state battery breakthrough", "https://example.com/battery", summary="A battery prototype stores more energy.")
+        robot = Article("Example", "Researchers demonstrate humanoid robot artificial muscle", "https://example.com/robot", summary="A humanoid robot prototype gains feedback.")
+
+        ranked = rank_articles([ai_1, ai_2, battery, robot], limit=3)
+
+        self.assertIn(battery, ranked[:3])
+        self.assertIn(robot, ranked[:3])
+        self.assertEqual(len(ranked), 3)
+
+    def test_ranker_groups_related_quantum_topics_for_variety(self) -> None:
+        quantum_computing = Article(
+            "Example",
+            "Quantum breakthrough could revolutionize teleportation and computing",
+            "https://example.com/quantum-computing",
+            summary="Researchers demonstrated quantum computing progress.",
+        )
+        quantum_chip = Article(
+            "Example",
+            "Prototype sets record for optical quantum information technology",
+            "https://example.com/quantum-chip",
+            summary="Scientists built a quantum chip prototype.",
+        )
+        battery = Article(
+            "Example",
+            "Scientists unveil DNA battery that charges directly from the sun",
+            "https://example.com/battery",
+            summary="A battery prototype stores more energy.",
+        )
+
+        ranked = rank_articles([quantum_computing, quantum_chip, battery], limit=2)
+
+        self.assertIn(battery, ranked)
+        self.assertEqual(len(ranked), 2)
+
+    def test_ranker_filters_syndicated_versions_of_same_story(self) -> None:
+        first = Article(
+            "Example",
+            "OpenAI's AI solves 80-year-old maths problem, marking major breakthrough",
+            "https://example.com/ai-math-1",
+            summary="Artificial intelligence made a mathematics breakthrough.",
+        )
+        duplicate = Article(
+            "Example",
+            "Mathematicians stunned by AI's biggest breakthrough in mathematics yet",
+            "https://example.com/ai-math-2",
+            summary="Experts say the AI math result is a breakthrough.",
+        )
+        battery = Article(
+            "Example",
+            "Scientists unveil DNA battery that charges directly from the sun",
+            "https://example.com/battery",
+            summary="A battery prototype stores more energy.",
+        )
+
+        ranked = rank_articles([first, duplicate, battery], limit=2)
+
+        self.assertIn(battery, ranked)
+        self.assertEqual(len(ranked), 2)
+        self.assertFalse(first in ranked and duplicate in ranked)
+
     def test_caption_includes_explainer_source_and_hashtags(self) -> None:
         article = Article(
             source="Science Wire",
