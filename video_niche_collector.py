@@ -90,10 +90,7 @@ def niche_score(entry: VideoEntry, niche: str, keywords: Iterable[str]) -> int:
     return score
 
 
-def load_manifest(path: Path) -> list[VideoEntry]:
-    with path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
-
+def parse_manifest_data(payload: object) -> list[VideoEntry]:
     records = payload.get("videos", payload) if isinstance(payload, dict) else payload
     if not isinstance(records, list):
         raise ValueError("Manifest must be a JSON list or an object with a 'videos' list.")
@@ -121,6 +118,12 @@ def load_manifest(path: Path) -> list[VideoEntry]:
             )
         )
     return entries
+
+
+def load_manifest(path: Path) -> list[VideoEntry]:
+    with path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    return parse_manifest_data(payload)
 
 
 def is_url(source: str) -> bool:

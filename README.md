@@ -64,6 +64,29 @@ Optional fields used for matching:
 
 ## Usage
 
+### Browser site
+
+Start the local web app:
+
+```bash
+python3 web_niche_collector.py --host 0.0.0.0 --port 8000
+```
+
+Then open:
+
+```text
+http://localhost:8000
+```
+
+In Cursor Cloud, open the forwarded port for `8000` if your browser is not on
+the same machine. The page lets you paste Instagram/TikTok URLs, enter a niche,
+and copy the matching URLs from the results box.
+
+The site filters URLs you provide. It does not search or scrape Instagram or
+TikTok.
+
+### Command line
+
 Preview matches without downloading or copying:
 
 ```bash

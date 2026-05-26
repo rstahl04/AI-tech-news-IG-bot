@@ -8,6 +8,7 @@ from video_niche_collector import (
     export_matching_social_urls,
     load_manifest,
     niche_score,
+    parse_manifest_data,
     reject_blocked_source,
     safe_stem,
 )
@@ -56,6 +57,23 @@ class VideoNicheCollectorTests(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         self.assertFalse(entries[0].authorized)
         self.assertEqual(entries[0].tags, ("gym",))
+
+    def test_parse_manifest_data_accepts_payload(self):
+        entries = parse_manifest_data(
+            {
+                "videos": [
+                    {
+                        "source": "https://www.instagram.com/reel/example/",
+                        "title": "Gym fail",
+                        "authorized": True,
+                    }
+                ]
+            }
+        )
+
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0].authorized)
+        self.assertEqual(entries[0].source, "https://www.instagram.com/reel/example/")
 
     def test_safe_stem_removes_unsafe_characters(self):
         self.assertEqual(safe_stem("Gym fail: rep #1!", "fallback"), "Gym-fail-rep-1")
