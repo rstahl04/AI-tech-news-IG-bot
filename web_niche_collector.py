@@ -31,27 +31,30 @@ def split_keywords(value: str) -> list[str]:
 
 
 def parse_social_url_lines(lines: str, assumed_context: str = "") -> list[VideoEntry]:
-    """Parse quick-entry URL lines into authorized manifest entries.
+    """Parse quick-entry pasted text into authorized manifest entries.
 
-    Accepted line formats:
+    Accepted formats:
     - https://www.instagram.com/reel/example/
     - https://www.tiktok.com/@creator/video/123 | gym fail treadmill
     - gym fail treadmill https://www.instagram.com/reel/example/
+    - A copied text block containing multiple social URLs.
     """
 
     entries: list[VideoEntry] = []
     url_pattern = re.compile(r"https?://\S+")
-    for line_number, raw_line in enumerate(lines.splitlines(), start=1):
+    context_lines: list[str] = []
+
+    for raw_line in lines.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
 
-        match = url_pattern.search(line)
-        if not match:
-            raise ValueError(f"Line {line_number} does not contain a URL.")
+        matches = list(url_pattern.finditer(line))
+        if not matches:
+            context_lines.append(line)
+            continue
 
-        url = match.group(0).rstrip(".,;)")
-        notes = (line[: match.start()] + " " + line[match.end() :]).strip(" |,-")
+        notes = url_pattern.sub(" ", line).strip(" |,-")
         if "|" in line:
             parts = [part.strip() for part in line.split("|", 1)]
             if parts[0].startswith("http"):
@@ -59,20 +62,34 @@ def parse_social_url_lines(lines: str, assumed_context: str = "") -> list[VideoE
             elif parts[1].startswith("http"):
                 notes = parts[0]
 
-        if not is_social_url(url):
-            raise ValueError(f"Line {line_number} is not an Instagram or TikTok URL.")
+        context = " ".join(part for part in (notes, " ".join(context_lines), assumed_context) if part)
+        context_lines.clear()
 
-        context = " ".join(part for part in (notes, assumed_context) if part)
-        entries.append(
-            VideoEntry(
-                source=url,
-                title=context,
-                description=context,
-                tags=tuple(split_keywords(context)),
-                authorized=True,
+        for match in matches:
+            url = clean_pasted_url(match.group(0))
+            if not is_social_url(url):
+                continue
+
+            entries.append(
+                VideoEntry(
+                    source=url,
+                    title=context,
+                    description=context,
+                    tags=tuple(split_keywords(context)),
+                    authorized=True,
+                )
             )
+
+    if not entries:
+        raise ValueError(
+            "No Instagram/TikTok links were found. Paste one or more reel/video URLs first; "
+            "this site filters pasted links but does not search those platforms automatically."
         )
     return entries
+
+
+def clean_pasted_url(value: str) -> str:
+    return value.rstrip(".,;)]}>\"'")
 
 
 def matching_social_urls(
@@ -145,6 +162,7 @@ def render_page(
     label {{ display: block; font-weight: 700; margin-top: 1rem; }}
     button {{ background: #111827; border: 0; border-radius: 0.5rem; color: white; cursor: pointer; font: inherit; margin-top: 1rem; padding: 0.75rem 1rem; }}
     .hint, .policy {{ color: #4b5563; }}
+    .notice {{ background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.75rem; color: #1e3a8a; padding: 1rem; }}
     .grid {{ display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }}
     .box {{ background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1rem; }}
     .error {{ background: #fef2f2; border-color: #fecaca; color: #991b1b; }}
@@ -156,6 +174,9 @@ def render_page(
 <body>
   <h1>Video Niche URL Collector</h1>
   <p class="policy">Paste Instagram/TikTok URLs you already have permission to track or collect through authorized means. This page filters and exports links only; it does not scrape platforms, download videos, or remove watermarks.</p>
+  <div class="notice">
+    <strong>Important:</strong> This is not an Instagram/TikTok search engine. Paste links first, then the site finds the matching links from what you pasted.
+  </div>
   {"<div class='box error'><strong>Error:</strong> " + html.escape(error) + "</div>" if error else ""}
   <form method="post" action="/export">
     <div class="grid">
@@ -173,8 +194,8 @@ def render_page(
       </div>
     </div>
 
-    <label for="urls">Quick URL list</label>
-    <p class="hint">Use one URL per line. Optional notes after a pipe help matching: <code>URL | gym fail treadmill</code>.</p>
+    <label for="urls">Paste Instagram/TikTok links or copied text</label>
+    <p class="hint">You can paste one URL per line, multiple URLs in a text block, or notes after a pipe: <code>URL | gym fail treadmill</code>.</p>
     <textarea id="urls" name="urls">{html.escape(urls)}</textarea>
 
     <div class="checkbox">

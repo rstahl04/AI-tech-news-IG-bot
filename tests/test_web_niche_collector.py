@@ -19,6 +19,28 @@ class WebNicheCollectorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_social_url_lines("https://example.com/video.mp4 | gym fail")
 
+    def test_parse_social_url_lines_extracts_multiple_urls_from_text_block(self):
+        entries = parse_social_url_lines(
+            """
+            Here are some gym fail clips:
+            https://www.instagram.com/reel/first-example/ and https://www.tiktok.com/@creator/video/456.
+            Ignore this one https://example.com/not-social
+            """,
+            assumed_context="gym fails",
+        )
+
+        self.assertEqual(
+            [entry.source for entry in entries],
+            [
+                "https://www.instagram.com/reel/first-example/",
+                "https://www.tiktok.com/@creator/video/456",
+            ],
+        )
+
+    def test_parse_social_url_lines_explains_empty_input(self):
+        with self.assertRaisesRegex(ValueError, "Paste one or more"):
+            parse_social_url_lines("gym fails")
+
     def test_matching_social_urls_deduplicates_matches(self):
         entries = parse_social_url_lines(
             "\n".join(
