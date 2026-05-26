@@ -1,0 +1,49 @@
+{
+  "name": "creator-ai-chatbot-starter",
+  "version": "1.0.0",
+  "description": "Compliance-minded AI chat assistant starter for creator businesses.",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rstahl04/AI-tech-news-IG-bot.git"
+  },
+  "keywords": [
+    "creator",
+    "chatbot",
+    "ai",
+    "saas"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rstahl04/AI-tech-news-IG-bot/issues"
+  },
+  "homepage": "https://github.com/rstahl04/AI-tech-news-IG-bot#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "nanoid": "^5.1.11",
+    "openai": "^6.39.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}
