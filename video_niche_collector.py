@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Collect authorized niche videos into a cleaned output folder.
 
-This tool intentionally does not scrape Instagram or remove watermarks. It works
-with local files or direct media URLs that you own or have permission to use,
-then strips container metadata with ffmpeg before saving matched videos.
+This tool intentionally does not scrape Instagram/TikTok or remove watermarks.
+It works with local files or direct media URLs that you own or have permission
+to use, then strips container metadata with ffmpeg before saving matched videos.
+It can also export matching Instagram/TikTok URLs that you provide in the
+manifest, without downloading them.
 """
 
 from __future__ import annotations
@@ -37,6 +39,7 @@ class VideoEntry:
     """A single manifest item."""
 
     source: str
+    page_url: str = ""
     title: str = ""
     description: str = ""
     tags: tuple[str, ...] = ()
@@ -51,6 +54,7 @@ class VideoEntry:
                 self.description,
                 " ".join(self.tags),
                 Path(urllib.parse.urlparse(self.source).path).stem,
+                Path(urllib.parse.urlparse(self.page_url).path).stem,
             )
             if part
         )
@@ -109,6 +113,7 @@ def load_manifest(path: Path) -> list[VideoEntry]:
         entries.append(
             VideoEntry(
                 source=source,
+                page_url=str(record.get("page_url", record.get("url", ""))).strip(),
                 title=str(record.get("title", "")).strip(),
                 description=str(record.get("description", "")).strip(),
                 tags=tuple(str(tag).strip() for tag in tags if str(tag).strip()),
@@ -123,16 +128,29 @@ def is_url(source: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
-def reject_blocked_source(source: str) -> None:
+def is_social_url(source: str) -> bool:
     if not is_url(source):
-        return
+        return False
     host = urllib.parse.urlparse(source).hostname or ""
     host = host.lower()
-    if host in BLOCKED_HOSTS or host.endswith(".instagram.com") or host.endswith(".tiktok.com"):
+    return host in BLOCKED_HOSTS or host.endswith(".instagram.com") or host.endswith(".tiktok.com")
+
+
+def reject_blocked_source(source: str) -> None:
+    if is_social_url(source):
         raise ValueError(
             "Instagram/TikTok scraping or downloading is not supported. "
             "Use local files or direct media URLs you are authorized to process."
         )
+
+
+def social_export_url(entry: VideoEntry) -> str:
+    """Return the first social URL provided for an entry, if any."""
+
+    for candidate in (entry.page_url, entry.source):
+        if is_social_url(candidate):
+            return candidate
+    return ""
 
 
 def infer_extension(source: str, default: str = ".mp4") -> str:
@@ -262,6 +280,47 @@ def collect_videos(
     return matched_count
 
 
+def export_matching_social_urls(
+    manifest_path: Path,
+    output_path: Path,
+    niche: str,
+    keywords: Iterable[str],
+    min_score: int,
+) -> int:
+    """Write matching Instagram/TikTok URLs from the manifest to a text file."""
+
+    entries = load_manifest(manifest_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    exported_urls: list[str] = []
+    seen_urls: set[str] = set()
+
+    for index, entry in enumerate(entries, start=1):
+        if not entry.authorized:
+            print(f"URL SKIP {index}: not marked authorized=true")
+            continue
+
+        url = social_export_url(entry)
+        if not url:
+            print(f"URL SKIP {index}: no Instagram/TikTok URL provided")
+            continue
+
+        score = niche_score(entry, niche, keywords)
+        if score < min_score:
+            print(f"URL SKIP {index}: score {score} below threshold {min_score}")
+            continue
+
+        if url in seen_urls:
+            print(f"URL SKIP {index}: duplicate URL")
+            continue
+
+        seen_urls.add(url)
+        exported_urls.append(url)
+        print(f"URL MATCH {index}: score {score} -> {url}")
+
+    output_path.write_text("\n".join(exported_urls) + ("\n" if exported_urls else ""), encoding="utf-8")
+    return len(exported_urls)
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -278,6 +337,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Extra keyword to match. May be provided multiple times.",
     )
     parser.add_argument("--output", type=Path, default=Path("videos"), help="Output folder.")
+    parser.add_argument(
+        "--urls-output",
+        type=Path,
+        help="Write matching Instagram/TikTok URLs from the manifest to this text file.",
+    )
+    parser.add_argument(
+        "--urls-only",
+        action="store_true",
+        help="Only export matching URLs. Requires --urls-output and skips video processing.",
+    )
     parser.add_argument("--min-score", type=int, default=1, help="Minimum niche match score.")
     parser.add_argument(
         "--allow-copy-without-ffmpeg",
@@ -292,6 +361,21 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     if args.min_score < 1:
         raise ValueError("--min-score must be at least 1")
+    if args.urls_only and not args.urls_output:
+        raise ValueError("--urls-only requires --urls-output")
+
+    if args.urls_output:
+        url_count = export_matching_social_urls(
+            manifest_path=args.manifest,
+            output_path=args.urls_output,
+            niche=args.niche,
+            keywords=args.keyword,
+            min_score=args.min_score,
+        )
+        print(f"Done. Exported {url_count} matching Instagram/TikTok URL(s).")
+        if args.urls_only:
+            return 0
+
     matched = collect_videos(
         manifest_path=args.manifest,
         output_folder=args.output,

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from video_niche_collector import (
     VideoEntry,
+    export_matching_social_urls,
     load_manifest,
     niche_score,
     reject_blocked_source,
@@ -58,6 +59,65 @@ class VideoNicheCollectorTests(unittest.TestCase):
 
     def test_safe_stem_removes_unsafe_characters(self):
         self.assertEqual(safe_stem("Gym fail: rep #1!", "fallback"), "Gym-fail-rep-1")
+
+    def test_exports_matching_social_urls(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            manifest = temp_path / "manifest.json"
+            output = temp_path / "matched_urls.txt"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "videos": [
+                            {
+                                "source": "/tmp/owned.mp4",
+                                "page_url": "https://www.instagram.com/reel/gym-fail-1/",
+                                "title": "Gym fail",
+                                "tags": ["gym", "fails"],
+                                "authorized": True,
+                            },
+                            {
+                                "source": "https://www.tiktok.com/@creator/video/123",
+                                "title": "Treadmill gym fail",
+                                "tags": ["fitness"],
+                                "authorized": True,
+                            },
+                            {
+                                "source": "https://www.instagram.com/reel/skip-this/",
+                                "title": "Cooking tip",
+                                "tags": ["food"],
+                                "authorized": True,
+                            },
+                            {
+                                "source": "https://www.instagram.com/reel/not-authorized/",
+                                "title": "Gym fail",
+                                "tags": ["gym"],
+                                "authorized": False,
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            exported_count = export_matching_social_urls(
+                manifest_path=manifest,
+                output_path=output,
+                niche="gym fails",
+                keywords=["treadmill"],
+                min_score=1,
+            )
+
+            exported_urls = output.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(exported_count, 2)
+        self.assertEqual(
+            exported_urls,
+            [
+                "https://www.instagram.com/reel/gym-fail-1/",
+                "https://www.tiktok.com/@creator/video/123",
+            ],
+        )
 
 
 if __name__ == "__main__":

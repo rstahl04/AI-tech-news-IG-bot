@@ -14,7 +14,8 @@ ownership and creator attribution, so that workflow is intentionally unsupported
 - Matches entries by niche phrase and keywords in the title, description, tags,
   and filename.
 - Accepts local video files or direct media URLs.
-- Rejects Instagram and TikTok URLs.
+- Rejects Instagram and TikTok URLs for downloading or video processing.
+- Exports matching Instagram/TikTok URLs from your manifest to a text file.
 - Uses `ffmpeg` to copy the video stream while removing container metadata.
 - Writes matching cleaned videos into an output folder.
 
@@ -38,6 +39,7 @@ Create a manifest like `examples/manifest.example.json`:
   "videos": [
     {
       "source": "/absolute/path/to/owned-gym-fail-clip.mp4",
+      "page_url": "https://www.instagram.com/reel/example-owned-gym-fail/",
       "title": "Gym fail compilation clip",
       "description": "A lifter misses a light warmup rep safely.",
       "tags": ["gym", "fails", "fitness"],
@@ -54,6 +56,8 @@ Every item must include:
 
 Optional fields used for matching:
 
+- `page_url`: an Instagram/TikTok page URL to export as a link. This URL is not
+  downloaded.
 - `title`
 - `description`
 - `tags`
@@ -79,6 +83,21 @@ python3 video_niche_collector.py \
   --keyword bench \
   --output videos
 ```
+
+Export matching Instagram/TikTok URLs only:
+
+```bash
+python3 video_niche_collector.py \
+  --manifest examples/manifest.example.json \
+  --niche "gym fails" \
+  --keyword treadmill \
+  --urls-output matched_social_urls.txt \
+  --urls-only
+```
+
+You can also combine URL export with normal video processing by leaving off
+`--urls-only`. Instagram/TikTok links will be written to the URL file but still
+skipped for downloading.
 
 If `ffmpeg` is unavailable, the program stops because it cannot guarantee
 metadata removal. For local testing only, you can copy matched files without

@@ -9,9 +9,17 @@
     },
     {
       "source": "https://cdn.example.com/your-licensed-video.mp4",
+      "page_url": "https://www.instagram.com/reel/example-owned-gym-fail/",
       "title": "Licensed bench press mistake",
-      "description": "Direct media URL for a clip you have permission to reuse.",
+      "description": "Direct media URL for a clip you have permission to reuse, with an optional social page URL for reporting.",
       "tags": ["bench", "gym"],
+      "authorized": true
+    },
+    {
+      "source": "https://www.tiktok.com/@youraccount/video/1234567890",
+      "title": "Gym fail on a treadmill",
+      "description": "A TikTok URL you collected through authorized or official means. This can be exported as a URL but will not be downloaded.",
+      "tags": ["gym", "fails", "treadmill"],
       "authorized": true
     },
     {
