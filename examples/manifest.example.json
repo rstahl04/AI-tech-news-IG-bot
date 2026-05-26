@@ -1,0 +1,25 @@
+{
+  "videos": [
+    {
+      "source": "/absolute/path/to/owned-gym-fail-clip.mp4",
+      "title": "Gym fail compilation clip",
+      "description": "A lifter misses a light warmup rep safely.",
+      "tags": ["gym", "fails", "fitness"],
+      "authorized": true
+    },
+    {
+      "source": "https://cdn.example.com/your-licensed-video.mp4",
+      "title": "Licensed bench press mistake",
+      "description": "Direct media URL for a clip you have permission to reuse.",
+      "tags": ["bench", "gym"],
+      "authorized": true
+    },
+    {
+      "source": "/absolute/path/to/unlicensed-video.mp4",
+      "title": "Do not process",
+      "description": "Entries must be explicitly authorized.",
+      "tags": ["gym"],
+      "authorized": false
+    }
+  ]
+}
