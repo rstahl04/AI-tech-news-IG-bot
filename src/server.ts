@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from "express";
-import pinoHttp from "pino-http";
+import { pinoHttp } from "pino-http";
 import { DmBot } from "./bot.js";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
