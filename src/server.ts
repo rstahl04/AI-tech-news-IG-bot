@@ -37,6 +37,10 @@ app.use(
 );
 app.use(pinoHttp({ logger }));
 
+app.get("/", (_req, res) => {
+  res.type("html").send(renderHomePage());
+});
+
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
@@ -141,6 +145,80 @@ async function handleIncoming(adapter: PlatformAdapter, message: IncomingMessage
     reason: decision.reason,
     replied: true
   };
+}
+
+function renderHomePage(): string {
+  const platforms = [...adapters.keys()].join(", ");
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(config.BOT_NAME)}</title>
+    <style>
+      body {
+        background: #0f172a;
+        color: #e2e8f0;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        padding: 32px;
+      }
+      main {
+        background: #111827;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        margin: 0 auto;
+        max-width: 760px;
+        padding: 28px;
+      }
+      code {
+        background: #1e293b;
+        border-radius: 6px;
+        padding: 2px 6px;
+      }
+      a {
+        color: #38bdf8;
+      }
+      .ok {
+        color: #86efac;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="ok">Running</p>
+      <h1>${escapeHtml(config.BOT_NAME)}</h1>
+      <p>This DM bot is ready to receive webhook events for ${escapeHtml(platforms)}.</p>
+      <h2>User commands</h2>
+      <ul>
+        <li><code>SUBSCRIBE</code> - opt in</li>
+        <li><code>LATEST</code> - get the latest digest</li>
+        <li><code>HELP</code> - see commands</li>
+        <li><code>STOP</code> - unsubscribe</li>
+      </ul>
+      <h2>Useful links</h2>
+      <ul>
+        <li><a href="/health">Health check JSON</a></li>
+        <li><code>/webhooks/instagram</code></li>
+        <li><code>/webhooks/tiktok</code></li>
+        <li><code>/webhooks/twitter</code></li>
+      </ul>
+      <p>Next step: add official platform credentials in <code>.env</code>, then configure these webhook URLs in each platform dashboard.</p>
+    </main>
+  </body>
+</html>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 if (process.env.NODE_ENV !== "test") {

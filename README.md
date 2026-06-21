@@ -35,6 +35,8 @@ Health check:
 curl http://localhost:3000/health
 ```
 
+Open `http://localhost:3000` in a browser to see a simple status page with commands and webhook paths.
+
 ## Webhook URLs
 
 Configure these URLs in the relevant platform developer dashboard or approved messaging provider:
