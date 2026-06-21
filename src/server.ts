@@ -144,8 +144,8 @@ async function handleIncoming(adapter: PlatformAdapter, message: IncomingMessage
 }
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(config.PORT, () => {
-    logger.info({ port: config.PORT }, "DM bot listening");
+  app.listen(config.PORT, config.HOST, () => {
+    logger.info({ host: config.HOST, port: config.PORT }, "DM bot listening");
   });
 }
 

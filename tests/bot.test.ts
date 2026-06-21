@@ -5,6 +5,7 @@ import type { AppConfig } from "../src/config.js";
 import type { IncomingMessage } from "../src/types.js";
 
 const baseConfig = {
+  HOST: "0.0.0.0",
   PORT: 3000,
   BOT_NAME: "Test Bot",
   BOT_TOPIC: "AI tech",

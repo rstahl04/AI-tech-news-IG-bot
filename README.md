@@ -27,7 +27,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The default server runs on port `3000`.
+The default server binds to `0.0.0.0` on port `3000`, which works with cloud workspace port forwarding.
 
 Health check:
 
@@ -51,6 +51,7 @@ Copy `.env.example` to `.env` and fill in credentials:
 
 | Variable | Purpose |
 | --- | --- |
+| `HOST` | Network host to bind, defaults to `0.0.0.0` for cloud previews |
 | `BOT_NAME` | Display name used in replies |
 | `BOT_TOPIC` | Topic used in replies, e.g. `AI technology news` |
 | `BOT_DAILY_MESSAGE_LIMIT` | Max replies per user per UTC day |
